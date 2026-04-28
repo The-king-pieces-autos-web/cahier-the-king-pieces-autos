@@ -52,7 +52,13 @@ const initialUsers = [
 ];
 
 function uid() { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
-function today() { return new Date().toISOString().slice(0, 10); }
+function today() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${year}-${month}-${day}`;
+}
 function money(n) { return `${Number(n || 0).toFixed(2)} €`; }
 function splitPieces(txt) { return String(txt || "").split(/\n|,|;/).map(x => x.trim()).filter(Boolean); }
 function isSameDay(d, day=today()) { return String(d||"").slice(0,10) === day; }
