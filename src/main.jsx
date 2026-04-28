@@ -57,16 +57,28 @@ function money(n) { return `${Number(n || 0).toFixed(2)} €`; }
 function splitPieces(txt) { return String(txt || "").split(/\n|,|;/).map(x => x.trim()).filter(Boolean); }
 function isSameDay(d, day=today()) { return String(d||"").slice(0,10) === day; }
 
+function generateNextNumero(fiches = []) {
+  const year = new Date().getFullYear();
+  const nums = fiches
+    .map((f) => String(f.numero || ""))
+    .map((n) => {
+      const match = n.match(new RegExp(`FICHE-${year}-(\\d+)`));
+      return match ? Number(match[1]) : 0;
+    });
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `FICHE-${year}-${String(next).padStart(4, "0")}`;
+}
+
 function propositionEmpty(num) {
   return { id: uid(), numero: num, reference: "", marque: "", prix: "", note: "", image: "", selectionnee: num === 1, retenue: num === 1 };
 }
 function emptyPiece(nom = "") {
   return { id: uid(), designation: nom, valide: false, image: "", remarque: "", propositions: [propositionEmpty(1), propositionEmpty(2)] };
 }
-function emptyFiche(user) {
+function emptyFiche(user, numeroAuto = "") {
   return {
     id: uid(),
-    numero: `FICHE-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
+    numero: numeroAuto || `FICHE-${new Date().getFullYear()}-0001`,
     date: today(),
     source: "sur_place",
     statut: "en_attente",
@@ -132,7 +144,8 @@ function App() {
     setSelectedUserId(u.role === "admin" ? "all" : u.id);
   }
   function newFiche() {
-    const f = emptyFiche(currentUser);
+    const f = emptyFiche(currentUser, generateNextNumero(data.fiches));
+    f.date = today();
     setEditing(f);
     setOpenPieceId("");
     setActive("edition");
