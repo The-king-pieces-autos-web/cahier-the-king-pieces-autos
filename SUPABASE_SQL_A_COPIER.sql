@@ -1,4 +1,6 @@
-create table if not exists public.app_state (
+drop table if exists public.app_state;
+
+create table public.app_state (
   id text primary key,
   payload jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
@@ -7,10 +9,9 @@ create table if not exists public.app_state (
 insert into public.app_state (id, payload, updated_at)
 values (
   'global',
-  '{"users":[{"id":"admin","nom":"Mokrane","identifiant":"mokrane","motDePasse":"admin","role":"admin"},{"id":"admin2","nom":"Administrateur","identifiant":"admin","motDePasse":"admin","role":"admin"}],"fiches":[],"devis":[],"archivesJour":[],"lastClosureDate":""}',
+  '{"users":[{"id":"admin","nom":"Administrateur","identifiant":"admin","motDePasse":"admin","role":"admin"},{"id":"mokrane","nom":"Mokrane","identifiant":"mokrane","motDePasse":"admin","role":"admin"}],"fiches":[],"devis":[],"archivesJour":[],"lastClosureDate":""}',
   now()
-)
-on conflict (id) do nothing;
+);
 
 alter table public.app_state disable row level security;
 grant usage on schema public to anon;

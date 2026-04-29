@@ -1,70 +1,98 @@
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Archive, BookOpen, Car, CheckCircle2, ClipboardList, Clock, Edit3, Euro, Eye, FileText, ImagePlus, LogOut, Plus, Printer, Save, Search, Send, Shield, Trash2, Users, X } from "lucide-react";
+import {
+  Archive, BookOpen, Car, CheckCircle2, ClipboardList, Clock, Edit3, Euro, Eye,
+  FileText, ImagePlus, LogOut, Plus, Printer, Save, Search, Send, Shield,
+  Trash2, Users, X
+} from "lucide-react";
 import "./styles.css";
 import logo from "./assets/logo.png";
 import hero from "./assets/dashboard-hero.jpeg";
 import { hasSupabaseConfig, loadCloudState, saveCloudState, subscribeCloudState, supabase } from "./lib/supabase";
 
 const ENTREPRISE = {
-  nom: "THE KING PIÈCES AUTOS",
+  nom: "THE KING PIECES AUTOS",
   slogan: "Vente toutes marques",
   adresse: "32 avenue Marcel Cachin, 93240 Stains",
   email: "thekingpiecesautos@gmail.com",
   tel: "0184741500",
   whatsapp: "+33650058945",
-  tva: "FR80977631530",
-  tauxTva: 20,
+  tvaNumber: "FR80977631530",
 };
 
-const LS_KEY = "tkpa_cahier_pro_v3";
-const SESSION_KEY = "tkpa_current_user_id";
+const LS_KEY = "tkpa_cahier_pro_v4";
+const SESSION_KEY = "tkpa_current_user";
 const CLOTURE_HEURE = 19;
 
 const CAR_MODELS = {
-  Peugeot: ["106", "107", "108", "206", "207", "208", "307", "308", "407", "508", "2008", "3008", "5008", "Partner", "Expert", "Boxer"],
-  Renault: ["Clio", "Megane", "Scenic", "Captur", "Kadjar", "Kangoo", "Trafic", "Master", "Twingo", "Laguna", "Espace"],
-  Citroën: ["C1", "C2", "C3", "C4", "C5", "Berlingo", "Jumpy", "Jumper", "C3 Aircross", "C5 Aircross"],
-  Volkswagen: ["Polo", "Golf", "Passat", "Touran", "Tiguan", "T-Roc", "T-Cross", "Caddy", "Transporter", "Crafter"],
-  Audi: ["A1", "A3", "A4", "A5", "A6", "Q2", "Q3", "Q5", "Q7"],
-  BMW: ["Série 1", "Série 2", "Série 3", "Série 5", "X1", "X3", "X5"],
-  "Mercedes-Benz": ["Classe A", "Classe B", "Classe C", "Classe E", "CLA", "GLA", "GLC", "Vito", "Sprinter"],
-  Ford: ["Fiesta", "Focus", "Kuga", "C-Max", "Mondeo", "Transit", "Ranger"],
-  Opel: ["Corsa", "Astra", "Mokka", "Insignia", "Zafira", "Vivaro", "Movano"],
-  Toyota: ["Yaris", "Auris", "Corolla", "RAV4", "C-HR", "Aygo", "Hilux"],
-  Nissan: ["Micra", "Juke", "Qashqai", "X-Trail", "Note", "NV200"],
-  Dacia: ["Sandero", "Logan", "Duster", "Dokker", "Jogger"],
-  Autre: ["Modèle à saisir manuellement"],
+  "Peugeot": ["106","107","108","206","207","208","307","308","407","508","2008","3008","5008","Partner","Expert","Boxer"],
+  "Renault": ["Clio","Megane","Scenic","Captur","Kadjar","Kangoo","Trafic","Master","Twingo","Laguna","Espace"],
+  "Citroën": ["C1","C2","C3","C4","C5","C3 Aircross","C4 Picasso","C5 Aircross","Berlingo","Jumpy","Jumper"],
+  "Volkswagen": ["Polo","Golf","Passat","Touran","Tiguan","T-Roc","T-Cross","Caddy","Transporter","Crafter"],
+  "Audi": ["A1","A3","A4","A5","A6","Q2","Q3","Q5","Q7"],
+  "BMW": ["Série 1","Série 2","Série 3","Série 5","X1","X3","X5"],
+  "Mercedes-Benz": ["Classe A","Classe B","Classe C","Classe E","CLA","GLA","GLC","Vito","Sprinter"],
+  "Ford": ["Fiesta","Focus","Kuga","C-Max","Mondeo","Transit","Ranger"],
+  "Opel": ["Corsa","Astra","Mokka","Insignia","Zafira","Vivaro","Movano"],
+  "Fiat": ["500","Panda","Punto","Tipo","Doblo","Ducato"],
+  "Toyota": ["Yaris","Auris","Corolla","RAV4","C-HR","Aygo","Hilux"],
+  "Nissan": ["Micra","Juke","Qashqai","X-Trail","Note","NV200"],
+  "Dacia": ["Sandero","Logan","Duster","Dokker","Lodgy","Jogger"],
+  "Autre": ["Modèle à saisir manuellement"]
 };
 const CAR_BRANDS = Object.keys(CAR_MODELS);
+
 const initialUsers = [
-  { id: "admin", nom: "Mokrane", identifiant: "mokrane", motDePasse: "admin", role: "admin" },
-  { id: "admin2", nom: "Administrateur", identifiant: "admin", motDePasse: "admin", role: "admin" },
+  { id: "admin", nom: "Administrateur", identifiant: "admin", motDePasse: "admin", role: "admin" },
+  { id: "mokrane", nom: "Mokrane", identifiant: "mokrane", motDePasse: "admin", role: "admin" },
 ];
 
-function uid() { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
-function today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
-function currentTime() { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
-function money(n) { return `${Number(n || 0).toFixed(2)} €`; }
-function ttcToHt(ttc) { return Number(ttc || 0) / (1 + ENTREPRISE.tauxTva / 100); }
-function ttcToTva(ttc) { return Number(ttc || 0) - ttcToHt(ttc); }
-function splitPieces(t) { return String(t || "").split(/\n|,|;/).map(x => x.trim()).filter(Boolean); }
-function normalizePlate(v = "") { return String(v).toUpperCase().replace(/[^A-Z0-9]/g, ""); }
-function isPlateSearch(v = "") { return normalizePlate(v).length >= 5; }
-function isSameDay(d, day = today()) { return String(d || "").slice(0, 10) === day; }
-function vehicleName(f) { return [f.marqueManuelle || f.marque, f.modeleManuel || f.modele, f.finition].filter(Boolean).join(" "); }
+function uid(){ return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+function today(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function nowTime(){ const d = new Date(); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
+function money(n){ return `${Number(n || 0).toFixed(2)} €`; }
+function htFromTtc(ttc){ return Number(ttc || 0) / 1.2; }
+function tvaFromTtc(ttc){ return Number(ttc || 0) - htFromTtc(ttc); }
+function splitPieces(txt){ return String(txt || "").split(/\n|,|;/).map(x=>x.trim()).filter(Boolean); }
+function normalizePlate(v=""){ return String(v).toUpperCase().replace(/[^A-Z0-9]/g,""); }
+function isPlateSearch(v=""){ return normalizePlate(v).length >= 5; }
+function isSameDay(d, day=today()){ return String(d||"").slice(0,10) === String(day).slice(0,10); }
+function vehicleName(f){ return [f.marqueManuelle || f.marque, f.modeleManuel || f.modele, f.finition].filter(Boolean).join(" "); }
+function nextNumber(items, prefix){ const y = new Date().getFullYear(); const nums = (items||[]).map(x=>String(x.numero||"")).map(n=>{ const m=n.match(new RegExp(`${prefix}-${y}-(\\d+)`)); return m?Number(m[1]):0; }); return `${prefix}-${y}-${String((nums.length?Math.max(...nums):0)+1).padStart(4,"0")}`; }
 
-function propEmpty(num) { return { id: uid(), numero: num, reference: "", marque: "", prix: "", note: "", image: "", selectionnee: num === 1 }; }
-function emptyPiece(nom = "") { return { id: uid(), designation: nom, quantite: 1, remarque: "", propositions: [propEmpty(1), propEmpty(2)] }; }
-function nextNum(items = [], prefix = "FICHE") { const y = new Date().getFullYear(); const nums = items.map(x => String(x.numero || "")).map(n => { const m = n.match(new RegExp(`${prefix}-${y}-(\\d+)`)); return m ? Number(m[1]) : 0; }); return `${prefix}-${y}-${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(4, "0")}`; }
-function selectedProps(p) { const props = p.propositions || []; const selected = props.filter(x => x.selectionnee); return selected.length ? selected : props.slice(0, 1); }
-function totalFiche(f) { return (f.pieces || []).reduce((sum, p) => sum + selectedProps(p).reduce((s, pr) => s + Number(pr.prix || 0) * Number(p.quantite || 1), 0), 0); }
-function devisLinesFromFiche(f) { return (f.pieces || []).flatMap(p => selectedProps(p).map(pr => ({ id: `${p.id}-${pr.id}`, designation: p.designation, quantite: Number(p.quantite || 1), prixTTC: Number(pr.prix || 0) }))); }
-function totalDevis(d) { return (d.lignes || []).reduce((s, l) => s + Number(l.quantite || 1) * Number(l.prixTTC || 0), 0); }
-function emptyFiche(user, all = []) { return { id: uid(), numero: nextNum(all, "FICHE"), date: today(), heureCreation: currentTime(), source: "sur_place", statut: "en_attente", enregistreCahier: false, envoyeDevis: false, clientNom: "", clientTelephone: "", immatriculation: "", vin: "", marque: "", modele: "", marqueManuelle: "", modeleManuel: "", finition: "", demandeRapide: "", remarque: "", creeParId: user?.id || "", creeParNom: user?.nom || "", pieces: [] }; }
-function emptyDevisFromFiche(f, all = []) { return { id: uid(), ficheId: f.id, numero: nextNum(all, "DEV"), date: today(), heureCreation: currentTime(), clientNom: f.clientNom || "", clientTelephone: f.clientTelephone || "", immatriculation: f.immatriculation || "", vin: f.vin || "", vehicule: vehicleName(f), creeParId: f.creeParId, creeParNom: f.creeParNom, lignes: devisLinesFromFiche(f), remarque: f.remarque || "" }; }
+function propositionEmpty(num){ return { id: uid(), numero: num, reference: "", marque: "", prix: "", note: "", image: "", selectionnee: num === 1 }; }
+function emptyPiece(nom=""){ return { id: uid(), designation: nom, quantite: 1, remarque: "", propositions: [propositionEmpty(1), propositionEmpty(2)] }; }
+function selectedProps(p){ const props = p.propositions || []; const sel = props.filter(x => x.selectionnee); return sel.length ? sel : props.slice(0,1); }
+function totalFiche(f){ return (f.pieces||[]).reduce((sum,p)=>sum+selectedProps(p).reduce((s,pr)=>s+Number(pr.prix||0)*Number(p.quantite||1),0),0); }
 
-function normalizeState(raw) {
+function emptyFiche(user, fiches=[]){
+  return {
+    id: uid(), numero: nextNumber(fiches, "FICHE"), date: today(), heureCreation: nowTime(),
+    source: "sur_place", statut: "en_attente", enregistreCahier: false, envoyeDevis: false,
+    clientNom: "", clientTelephone: "", immatriculation: "", vin: "",
+    marque: "", modele: "", marqueManuelle: "", modeleManuel: "", finition: "",
+    demandeRapide: "", remarque: "", creeParId: user?.id || "", creeParNom: user?.nom || "", pieces: [],
+  };
+}
+
+function linesFromFiche(f){
+  return (f.pieces||[]).flatMap(p=>selectedProps(p).map(pr=>({
+    id: `${p.id}-${pr.id}`, designation: p.designation, quantite: Number(p.quantite||1),
+    prixTTC: Number(pr.prix||0), note: pr.note || ""
+  })));
+}
+function emptyDevisFromFiche(f, devis=[]){
+  return {
+    id: uid(), ficheId: f.id, numero: nextNumber(devis,"DEV"), date: today(), heureCreation: nowTime(),
+    clientNom: f.clientNom, clientTelephone: f.clientTelephone, immatriculation: f.immatriculation,
+    vin: f.vin, vehicule: vehicleName(f), creeParId: f.creeParId, creeParNom: f.creeParNom,
+    lignes: linesFromFiche(f), remarque: f.remarque || ""
+  };
+}
+function totalDevis(d){ return (d.lignes||[]).reduce((s,l)=>s+Number(l.quantite||1)*Number(l.prixTTC||0),0); }
+
+function normalizeState(raw){
   return {
     users: Array.isArray(raw?.users) && raw.users.length ? raw.users : initialUsers,
     fiches: Array.isArray(raw?.fiches) ? raw.fiches : [],
@@ -73,133 +101,274 @@ function normalizeState(raw) {
     lastClosureDate: raw?.lastClosureDate || "",
   };
 }
-function loadState() { try { const x = localStorage.getItem(LS_KEY); if (x) return normalizeState(JSON.parse(x)); } catch {} return normalizeState({}); }
-function saveLocal(data) { localStorage.setItem(LS_KEY, JSON.stringify(normalizeState(data))); }
-async function saveEverywhere(data) { const clean = normalizeState(data); saveLocal(clean); if (hasSupabaseConfig) { try { await saveCloudState(clean); } catch (e) { console.error("Supabase save", e); } } }
-function saveSession(user) { localStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, identifiant: user.identifiant, nom: user.nom, role: user.role, motDePasse: user.motDePasse })); }
-function loadSession(users = []) { try { const raw = localStorage.getItem(SESSION_KEY); if (!raw) return null; const s = JSON.parse(raw); return users.find(u => u.id === s.id) || users.find(u => u.identifiant === s.identifiant) || null; } catch { return null; } }
-function clearSession() { localStorage.removeItem(SESSION_KEY); }
+function loadState(){ try{ const x=localStorage.getItem(LS_KEY); if(x) return normalizeState(JSON.parse(x)); }catch{} return normalizeState({}); }
+function saveLocal(data){ localStorage.setItem(LS_KEY, JSON.stringify(normalizeState(data))); }
+async function saveCloud(data){ if(!hasSupabaseConfig) return; await saveCloudState(normalizeState(data)); }
+function saveSession(u){ localStorage.setItem(SESSION_KEY, JSON.stringify({ id:u.id, identifiant:u.identifiant, nom:u.nom, role:u.role, motDePasse:u.motDePasse })); }
+function loadSession(users=[]){ try{ const s=JSON.parse(localStorage.getItem(SESSION_KEY)||"null"); if(!s) return null; return users.find(u=>u.id===s.id) || users.find(u=>u.identifiant===s.identifiant) || s; }catch{return null;} }
+function clearSession(){ localStorage.removeItem(SESSION_KEY); }
 
-function buildDailyArchive(data, dateValue = today()) { const fiches = data.fiches.filter(f => f.date === dateValue); const devis = data.devis.filter(d => d.date === dateValue); return { id: `ARCH-${dateValue}`, date: dateValue, createdAt: new Date().toISOString(), fiches, devis, resume: data.users.map(u => ({ userId: u.id, nom: u.nom, fiches: fiches.filter(f => f.creeParId === u.id).length, devis: devis.filter(d => d.creeParId === u.id).length, total: devis.filter(d => d.creeParId === u.id).reduce((s, d) => s + totalDevis(d), 0) })) }; }
-function closeDay(data, dateValue = today()) { const archive = buildDailyArchive(data, dateValue); const exists = data.archivesJour.some(a => a.date === dateValue); return { ...data, archivesJour: exists ? data.archivesJour.map(a => a.date === dateValue ? archive : a) : [archive, ...data.archivesJour], lastClosureDate: dateValue, fiches: data.fiches.map(f => f.date === dateValue ? { ...f, archiveJourId: archive.id } : f) }; }
-function shouldAutoClose(data) { const now = new Date(); return now.getHours() >= CLOTURE_HEURE && data.lastClosureDate !== today(); }
+function buildDailyArchive(data, dateValue=today()){
+  const fiches = data.fiches.filter(f=>f.date === dateValue);
+  const devis = data.devis.filter(d=>d.date === dateValue);
+  return {
+    id: `ARCH-${dateValue}`, date: dateValue, createdAt: new Date().toISOString(),
+    fiches: JSON.parse(JSON.stringify(fiches)),
+    devis: JSON.parse(JSON.stringify(devis)),
+    resume: data.users.map(u=>({
+      userId:u.id, nom:u.nom,
+      fiches:fiches.filter(f=>f.creeParId===u.id).length,
+      devis:devis.filter(d=>d.creeParId===u.id).length,
+      total:devis.filter(d=>d.creeParId===u.id).reduce((s,d)=>s+totalDevis(d),0)
+    }))
+  };
+}
+function closeDay(data, dateValue=today()){
+  const arch = buildDailyArchive(data, dateValue);
+  const archivesJour = data.archivesJour.some(a=>a.date===dateValue) ? data.archivesJour.map(a=>a.date===dateValue?arch:a) : [arch, ...data.archivesJour];
+  return { ...data, archivesJour, lastClosureDate: dateValue, fiches: data.fiches.map(f=>f.date===dateValue?{...f, archiveJourId:arch.id}:f), devis: data.devis.map(d=>d.date===dateValue?{...d, archiveJourId:arch.id}:d) };
+}
+function shouldAutoClose(data){ const d = new Date(); return d.getHours() >= CLOTURE_HEURE && data.lastClosureDate !== today(); }
 
-function Header({ title, subtitle }) { return <div className="header"><h1>{title}</h1><p>{subtitle}</p></div>; }
+function downloadJsonFile(filename, payload){
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
-function App() {
-  const [data, setData] = useState(() => normalizeState(loadState()));
-  const [login, setLogin] = useState({ identifiant: "", motDePasse: "" });
-  const [currentUser, setCurrentUser] = useState(() => loadSession(loadState().users));
+function readJsonFile(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try { resolve(JSON.parse(reader.result)); }
+      catch(e){ reject(e); }
+    };
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+
+function isRechercheTerminee(fiche){
+  const pieces = fiche.pieces || [];
+  if (!pieces.length) return false;
+  return pieces.every((p) => {
+    const props = selectedProps(p);
+    return p.designation && props.length && props.every((pr) => pr.prix);
+  });
+}
+
+
+function Header({title, subtitle}){ return <div className="header"><h1>{title}</h1><p>{subtitle}</p></div>; }
+
+function App(){
+  const [data, setData] = useState(()=>normalizeState(loadState()));
+  const [currentUser, setCurrentUser] = useState(()=>loadSession(loadState().users));
+  const [login, setLogin] = useState({ identifiant:"", motDePasse:"" });
   const [active, setActive] = useState("dashboard");
-  const [selectedUserId, setSelectedUserId] = useState("all");
   const [search, setSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("all");
   const [editing, setEditing] = useState(null);
   const [openPieceId, setOpenPieceId] = useState("");
   const [preview, setPreview] = useState(null);
+  const [archiveOpen, setArchiveOpen] = useState(null);
+  const [userForm, setUserForm] = useState({ nom:"", identifiant:"", motDePasse:"", role:"salarie" });
   const [syncStatus, setSyncStatus] = useState(hasSupabaseConfig ? "Connexion Supabase..." : "Mode local");
-  const [userForm, setUserForm] = useState({ nom: "", identifiant: "", motDePasse: "", role: "salarie" });
   const lastSaveRef = useRef(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function start() {
-      if (!hasSupabaseConfig) { setSyncStatus("Mode local"); return; }
-      try {
-        const cloud = await loadCloudState();
-        const clean = cloud ? normalizeState(cloud) : normalizeState(loadState());
-        if (!cloud) await saveCloudState(clean);
-        if (cancelled) return;
+  useEffect(()=>{
+    let cancelled=false;
+    async function start(){
+      if(!hasSupabaseConfig){ setSyncStatus("Mode local"); return; }
+      try{
+        const cloud=await loadCloudState();
+        if(cancelled) return;
+        const clean=cloud?normalizeState(cloud):normalizeState(loadState());
+        if(!cloud) await saveCloudState(clean);
         setData(clean); saveLocal(clean);
-        const savedUser = loadSession(clean.users); if (savedUser) setCurrentUser(savedUser);
+        const su=loadSession(clean.users); if(su) setCurrentUser(su);
         setSyncStatus("Synchronisé Supabase");
-      } catch (e) { console.error(e); setSyncStatus("Erreur Supabase"); }
+      }catch(e){ console.error(e); setSyncStatus("Erreur Supabase"); }
     }
     start();
-    const channel = subscribeCloudState(next => {
-      if (Date.now() - lastSaveRef.current < 800) return;
-      const clean = normalizeState(next);
-      setData(clean); saveLocal(clean);
-      const savedUser = loadSession(clean.users); if (savedUser) setCurrentUser(savedUser);
+    const ch = subscribeCloudState((next)=>{
+      if(Date.now()-lastSaveRef.current<800) return;
+      const clean=normalizeState(next); setData(clean); saveLocal(clean);
+      const su=loadSession(clean.users); if(su) setCurrentUser(su);
       setSyncStatus("Mise à jour reçue");
     });
-    return () => { cancelled = true; if (channel && supabase) supabase.removeChannel(channel); };
-  }, []);
+    return ()=>{ cancelled=true; if(ch&&supabase) supabase.removeChannel(ch); };
+  },[]);
 
-  useEffect(() => { if (currentUser) setSelectedUserId(currentUser.role === "admin" ? "all" : currentUser.id); }, [currentUser?.id]);
-  useEffect(() => { if (shouldAutoClose(data)) commit(closeDay(data, today())); }, [data.fiches.length, data.devis.length]);
+  useEffect(()=>{ if(currentUser) setSelectedUserId(currentUser.role==="admin"?"all":currentUser.id); },[currentUser?.id]);
+  useEffect(()=>{ if(shouldAutoClose(data)) commit(closeDay(data, today())); },[data.fiches.length, data.devis.length]);
 
-  function commit(next) { const clean = normalizeState(next); lastSaveRef.current = Date.now(); setData(clean); saveEverywhere(clean); setSyncStatus(hasSupabaseConfig ? "Sauvegardé et synchronisé" : "Sauvegardé local"); }
-  function connect(e) { e.preventDefault(); const user = data.users.find(u => u.identifiant.toLowerCase() === login.identifiant.trim().toLowerCase() && u.motDePasse === login.motDePasse); if (!user) return alert("Identifiant ou mot de passe incorrect."); setCurrentUser(user); saveSession(user); }
-  function newFiche() { const f = emptyFiche(currentUser, data.fiches); setEditing(f); setOpenPieceId(""); setActive("edition"); }
-  function saveFiche(fiche = editing, statutForce = null, showAlert = true) { const f = { ...fiche, statut: statutForce || fiche.statut, enregistreCahier: true }; if (!f.demandeRapide && !(f.pieces || []).length && !f.immatriculation && !f.vin && !f.clientNom) return alert("Ajoute une demande, une plaque, un VIN ou un nom."); const exists = data.fiches.some(x => x.id === f.id); const fiches = exists ? data.fiches.map(x => x.id === f.id ? f : x) : [f, ...data.fiches]; commit({ ...data, fiches }); setEditing(f); if (showAlert) alert(statutForce === "en_attente" ? "Mis en attente." : "Enregistré dans le cahier."); }
-  function sendToDevis(fiche = editing) { const f = { ...fiche, statut: "realise", enregistreCahier: true, envoyeDevis: true }; if (!devisLinesFromFiche(f).length) return alert("Ajoute au minimum une pièce avec prix sélectionné."); const devis = emptyDevisFromFiche(f, data.devis); const exists = data.fiches.some(x => x.id === f.id); const fiches = exists ? data.fiches.map(x => x.id === f.id ? f : x) : [f, ...data.fiches]; commit({ ...data, fiches, devis: [devis, ...data.devis] }); setEditing(f); setActive("devis"); alert("Envoyé dans la partie Devis."); }
-  function canEdit(f) { return currentUser?.role === "admin" || f.creeParId === currentUser?.id; }
-  function canDelete() { return currentUser?.role === "admin"; }
+  function commit(next){
+    const clean=normalizeState(next); lastSaveRef.current=Date.now(); setData(clean); saveLocal(clean);
+    saveCloud(clean).then(()=>setSyncStatus(hasSupabaseConfig?"Sauvegardé et synchronisé":"Sauvegardé local")).catch(e=>{ console.error(e); setSyncStatus("Erreur sauvegarde Supabase"); });
+  }
+  async function restoreFullBackup(file){
+    if(!file) return;
+    if(!confirm("Restaurer cette sauvegarde générale ? Les données actuelles seront remplacées.")) return;
+    try{
+      const json = await readJsonFile(file);
+      const clean = normalizeState(json);
+      commit(clean);
+      alert("Sauvegarde restaurée avec succès.");
+    }catch(e){
+      console.error(e);
+      alert("Fichier de sauvegarde invalide.");
+    }
+  }
 
-  const visibleFiches = useMemo(() => {
-    const q = search.trim().toLowerCase(); const plateQ = normalizePlate(search); const plateMode = currentUser?.role !== "admin" && isPlateSearch(search);
-    return data.fiches.filter(f => {
-      if (!q) return currentUser?.role === "admin" ? (selectedUserId === "all" || f.creeParId === selectedUserId) && f.date === today() : f.creeParId === currentUser?.id && f.date === today();
-      if (currentUser?.role === "admin") return selectedUserId === "all" || f.creeParId === selectedUserId;
-      if (f.creeParId === currentUser?.id) return true;
-      return plateMode && normalizePlate(f.immatriculation).includes(plateQ);
-    }).filter(f => {
-      if (!q) return true;
-      if (currentUser?.role !== "admin" && f.creeParId !== currentUser?.id) return normalizePlate(f.immatriculation).includes(plateQ);
-      const text = [f.numero, f.clientNom, f.clientTelephone, f.immatriculation, f.vin, vehicleName(f), f.creeParNom, f.demandeRapide, ...(f.pieces || []).flatMap(p => [p.designation, ...(p.propositions || []).flatMap(pr => [pr.reference, pr.marque, pr.prix])])].join(" ").toLowerCase();
-      return text.includes(q);
-    });
-  }, [data.fiches, search, selectedUserId, currentUser]);
+  function exportFullBackup(){
+    const payload = normalizeState(data);
+    downloadJsonFile(`sauvegarde-generale-cahier-pro-${today()}-${nowTime().replace(":","h")}.json`, payload);
+  }
 
-  const visibleDevis = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return data.devis.filter(d => currentUser?.role === "admin" || d.creeParId === currentUser?.id).filter(d => {
-      if (!q) return true;
-      return [d.numero, d.clientNom, d.clientTelephone, d.immatriculation, d.vin, d.vehicule, ...(d.lignes || []).map(l => l.designation)].join(" ").toLowerCase().includes(q);
-    });
-  }, [data.devis, search, currentUser]);
+  function connect(e){
+    e.preventDefault();
+    const u=data.users.find(x=>x.identifiant.toLowerCase()===login.identifiant.trim().toLowerCase() && x.motDePasse===login.motDePasse);
+    if(!u) return alert("Identifiant ou mot de passe incorrect.");
+    setCurrentUser(u); saveSession(u);
+  }
+  function newFiche(){ const f=emptyFiche(currentUser,data.fiches); setEditing(f); setOpenPieceId(""); setActive("edition"); }
+  function saveFiche(fiche=editing, msg=true){
+    let f={...fiche,enregistreCahier:true};
+    if(!f.demandeRapide && !(f.pieces||[]).length && !f.immatriculation && !f.vin && !f.clientNom) return alert("Ajoute au minimum une demande, une plaque, un VIN ou un nom.");
 
-  if (!currentUser) return <Login login={login} setLogin={setLogin} connect={connect} />;
+    // Si le salarié clique "Mettre en attente", le statut reste en_attente.
+    // Sinon, dès que la recherche contient des pièces avec prix, le statut passe automatiquement en Réalisé.
+    if(f.statut !== "en_attente" && isRechercheTerminee(f)){
+      f = {...f, statut:"realise"};
+    }
 
-  const statsByUser = data.users.map(u => { const fiches = data.fiches.filter(f => f.creeParId === u.id && isSameDay(f.date)); const devis = data.devis.filter(d => d.creeParId === u.id && isSameDay(d.date)); return { user: u, fiches: fiches.length, attente: fiches.filter(f => f.statut === "en_attente").length, realise: fiches.filter(f => f.statut === "realise").length, devis: devis.length, total: devis.reduce((s, d) => s + totalDevis(d), 0) }; });
+    const fiches=data.fiches.some(x=>x.id===f.id)?data.fiches.map(x=>x.id===f.id?f:x):[f,...data.fiches];
+    commit({...data,fiches}); setEditing(f); if(msg) alert(f.statut==="realise" ? "Devis enregistré comme réalisé." : "Enregistré dans le cahier.");
+  }
+  function sendToDevis(fiche=editing){
+    const f={...fiche,statut:"realise",enregistreCahier:true,envoyeDevis:true};
+    if(!linesFromFiche(f).length) return alert("Ajoute au minimum une pièce avec un prix sélectionné.");
+    const dev=emptyDevisFromFiche(f,data.devis);
+    const fiches=data.fiches.some(x=>x.id===f.id)?data.fiches.map(x=>x.id===f.id?f:x):[f,...data.fiches];
+    commit({...data,fiches,devis:[dev,...data.devis]});
+    setEditing(f); setActive("devis"); alert("Envoyé dans la partie Devis.");
+  }
+  function canEdit(f){ return currentUser?.role==="admin" || f.creeParId===currentUser?.id; }
+  function canDelete(){ return currentUser?.role==="admin"; }
+
+  const visibleFiches = useMemo(()=>{
+    const q=search.trim().toLowerCase(), plateQ=normalizePlate(search), plateMode=currentUser?.role!=="admin" && isPlateSearch(search);
+    return data.fiches
+      .filter(f=>{
+        const todayMode = !q;
+        if(todayMode && f.date !== today()) return false;
+        if(currentUser?.role==="admin") return selectedUserId==="all" || f.creeParId===selectedUserId;
+        if(f.creeParId===currentUser?.id) return true;
+        return plateMode && normalizePlate(f.immatriculation).includes(plateQ);
+      })
+      .filter(f=>{
+        if(!q) return true;
+        if(currentUser?.role!=="admin" && f.creeParId!==currentUser?.id) return normalizePlate(f.immatriculation).includes(plateQ);
+        const txt=[f.numero,f.clientNom,f.clientTelephone,f.immatriculation,f.vin,vehicleName(f),f.creeParNom,f.demandeRapide,...(f.pieces||[]).flatMap(p=>[p.designation,...(p.propositions||[]).flatMap(pr=>[pr.reference,pr.marque,pr.prix])])].join(" ").toLowerCase();
+        return txt.includes(q);
+      });
+  },[data.fiches,search,selectedUserId,currentUser]);
+
+  const visibleDevis = useMemo(()=>{
+    const q=search.trim().toLowerCase();
+    return data.devis
+      .filter(d=>q || d.date===today())
+      .filter(d=>currentUser?.role==="admin" || d.creeParId===currentUser?.id)
+      .filter(d=>!q || [d.numero,d.clientNom,d.clientTelephone,d.immatriculation,d.vin,d.vehicule,...(d.lignes||[]).map(l=>l.designation)].join(" ").toLowerCase().includes(q));
+  },[data.devis,search,currentUser]);
+
+  if(!currentUser){
+    return <div className="login-page"><div className="login-card"><div className="brand"><img src={logo}/><div><h1>{ENTREPRISE.nom}</h1><p>Cahier Pro synchronisé</p></div></div><form onSubmit={connect} className="login-form"><label>Identifiant<input value={login.identifiant} onChange={e=>setLogin({...login,identifiant:e.target.value})}/></label><label>Mot de passe<input type="password" value={login.motDePasse} onChange={e=>setLogin({...login,motDePasse:e.target.value})}/></label><button className="primary full">Connexion</button></form></div></div>;
+  }
+
+  const statsByUser=data.users.map(u=>{ const fiches=data.fiches.filter(f=>f.creeParId===u.id && isSameDay(f.date)); const devis=data.devis.filter(d=>d.creeParId===u.id && isSameDay(d.date)); return {user:u,fiches:fiches.length,realise:fiches.filter(f=>f.statut==="realise").length,devis:devis.length,total:devis.reduce((s,d)=>s+totalDevis(d),0)}; });
 
   return <div className="app">
     <aside>
-      <div className="side-brand"><img src={logo} /><b>{ENTREPRISE.nom}</b><small>{currentUser.nom} · {currentUser.role === "admin" ? "Administrateur" : "Salarié"}</small><small className="sync-status">{syncStatus}</small></div>
+      <div className="side-brand"><img src={logo}/><b>{ENTREPRISE.nom}</b><small>{currentUser.nom} · {currentUser.role==="admin"?"Administrateur":"Salarié"}</small><small className="sync-status">{syncStatus}</small></div>
       <nav>
-        <button className={active === "dashboard" ? "on" : ""} onClick={() => setActive("dashboard")}><BookOpen />Tableau de bord</button>
-        <button className={active === "cahier" ? "on" : ""} onClick={() => setActive("cahier")}><Archive />Cahier Pro</button>
-        <button onClick={newFiche}><Plus />Nouvelle demande</button>
-        <button className={active === "devis" ? "on" : ""} onClick={() => setActive("devis")}><FileText />Devis</button>
-        <button className={active === "sauvegardes" ? "on" : ""} onClick={() => setActive("sauvegardes")}><ClipboardList />Sauvegardes jour</button>
-        {currentUser.role === "admin" && <button className={active === "users" ? "on" : ""} onClick={() => setActive("users")}><Users />Utilisateurs</button>}
-        <button onClick={() => { clearSession(); setCurrentUser(null); }}><LogOut />Déconnexion</button>
+        <button className={active==="dashboard"?"on":""} onClick={()=>setActive("dashboard")}><BookOpen/>Tableau de bord</button>
+        <button className={active==="cahier"?"on":""} onClick={()=>setActive("cahier")}><Archive/>Cahier Pro</button>
+        <button onClick={newFiche}><Plus/>Nouvelle demande</button>
+        <button className={active==="devis"?"on":""} onClick={()=>setActive("devis")}><FileText/>Devis</button>
+        <button className={active==="sauvegardes"?"on":""} onClick={()=>setActive("sauvegardes")}><ClipboardList/>Sauvegardes jour</button>
+        {currentUser.role==="admin"&&<button className={active==="users"?"on":""} onClick={()=>setActive("users")}><Users/>Utilisateurs</button>}
+        <button onClick={()=>{clearSession();setCurrentUser(null);}}><LogOut/>Déconnexion</button>
       </nav>
     </aside>
     <main>
-      {active === "dashboard" && <Dashboard data={data} statsByUser={statsByUser} currentUser={currentUser} newFiche={newFiche} setEditing={setEditing} setOpenPieceId={setOpenPieceId} setActive={setActive} />}
-      {active === "cahier" && <CahierPro currentUser={currentUser} selectedUserId={selectedUserId} setSelectedUserId={setSelectedUserId} data={data} search={search} setSearch={setSearch} visibleFiches={visibleFiches} newFiche={newFiche} setEditing={setEditing} setOpenPieceId={setOpenPieceId} setActive={setActive} setPreview={setPreview} commit={commit} canEdit={canEdit} canDelete={canDelete} />}
-      {active === "edition" && editing && <Editor editing={editing} setEditing={setEditing} openPieceId={openPieceId} setOpenPieceId={setOpenPieceId} saveFiche={saveFiche} sendToDevis={sendToDevis} setPreview={setPreview} cancel={() => setActive("cahier")} />}
-      {active === "devis" && <DevisView visibleDevis={visibleDevis} search={search} setSearch={setSearch} />}
-      {active === "sauvegardes" && <Sauvegardes data={data} commit={commit} />}
-      {active === "users" && currentUser.role === "admin" && <UsersView data={data} commit={commit} currentUser={currentUser} userForm={userForm} setUserForm={setUserForm} />}
-      {preview && <PreviewModal fiche={preview} onClose={() => setPreview(null)} sendToDevis={() => sendToDevis(preview)} />}
+      {active==="dashboard"&&<section>
+        <div className="hero" style={{backgroundImage:`linear-gradient(90deg, rgba(7,21,60,.92), rgba(7,21,60,.55)), url(${hero})`}}><div><h1>Cahier Pro</h1><p>Demandes en attente, recherches réalisées, envoi vers devis client et sauvegarde journalière à 19h.</p><button className="primary" onClick={newFiche}><Plus/>Nouvelle demande</button></div></div>
+        {currentUser.role==="admin"?<><div className="stats"><div><Clock/><b>{data.fiches.filter(f=>f.statut==="en_attente"&&isSameDay(f.date)).length}</b><span>En attente</span></div><div><Edit3/><b>{data.fiches.filter(f=>f.statut==="en_cours"&&isSameDay(f.date)).length}</b><span>En cours</span></div><div><CheckCircle2/><b>{data.fiches.filter(f=>f.statut==="realise"&&isSameDay(f.date)).length}</b><span>Réalisés</span></div><div><Euro/><b>{money(data.devis.filter(d=>isSameDay(d.date)).reduce((s,d)=>s+totalDevis(d),0))}</b><span>Total devis du jour</span></div></div><div className="panel"><h3>Suivi efficacité par salarié aujourd’hui</h3><div className="employee-table"><div className="employee-head"><span>Salarié</span><span>Fiches</span><span>Réalisés</span><span>Devis</span><span>Total</span></div>{statsByUser.map(s=><div className="employee-row" key={s.user.id}><b>{s.user.nom}</b><span>{s.fiches}</span><span>{s.realise}</span><span>{s.devis}</span><span>{money(s.total)}</span></div>)}</div></div></>:<div className="dashboard-grid"><div className="panel"><h3>Mes statistiques aujourd’hui</h3>{(()=>{const f=data.fiches.filter(x=>x.creeParId===currentUser.id&&isSameDay(x.date));const d=data.devis.filter(x=>x.creeParId===currentUser.id&&isSameDay(x.date));return <div className="employee-personal-stats"><div><b>{f.length}</b><span>Mes fiches</span></div><div><b>{f.filter(x=>x.statut==="realise").length}</b><span>Réalisés</span></div><div><b>{d.length}</b><span>Mes devis</span></div><div><b>{money(d.reduce((s,x)=>s+totalDevis(x),0))}</b><span>Total</span></div></div>})()}</div><div className="panel"><h3>Mes demandes à reprendre</h3><ListResume items={data.fiches.filter(f=>f.creeParId===currentUser.id&&f.statut!=="realise"&&isSameDay(f.date)).slice(0,8)} open={(f)=>{setEditing(f);setOpenPieceId(f.pieces?.[0]?.id||"");setActive("edition")}}/></div></div>}
+      </section>}
+
+      {active==="cahier"&&<section><Header title="Cahier Pro" subtitle={currentUser.role==="admin"?"Admin : tous les cahiers. Recherche ancienne par plaque, VIN, nom, téléphone ou référence.":"Salarié : ton cahier uniquement. Exception : retrouver une fiche par plaque."}/><div className="toolbar"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom, téléphone..."/></div>{currentUser.role==="admin"?<select value={selectedUserId} onChange={e=>setSelectedUserId(e.target.value)}><option value="all">Tous les cahiers</option>{data.users.map(u=><option key={u.id} value={u.id}>Cahier de {u.nom}</option>)}</select>:<div className="locked-filter">Mon cahier</div>}<button className="primary" onClick={newFiche}><Plus/>Nouvelle</button></div><div className="cards">{visibleFiches.map(f=><FicheCard key={f.id} f={f} currentUser={currentUser} canEdit={canEdit(f)} canDelete={canDelete()} open={()=>{setEditing(f);setOpenPieceId(f.pieces?.[0]?.id||"");setActive("edition")}} preview={()=>setPreview(f)} del={()=>{if(confirm("Supprimer ?"))commit({...data,fiches:data.fiches.filter(x=>x.id!==f.id)})}} />)}</div></section>}
+
+      {active==="edition"&&editing&&<Editor editing={editing} setEditing={setEditing} openPieceId={openPieceId} setOpenPieceId={setOpenPieceId} saveFiche={saveFiche} sendToDevis={sendToDevis} setPreview={setPreview} cancel={()=>setActive("cahier")}/>}
+
+      {active==="devis"&&<section><Header title="Devis" subtitle="Devis client imprimable, sans références internes et sans remise."/><div className="toolbar single"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom..."/></div></div><div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className="badge realise">Devis client</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button></article>)}</div></section>}
+
+      {active==="sauvegardes"&&<section>
+        <Header title="Sauvegardes journalières" subtitle="À 19h, les fiches et devis du jour sont archivés en détail. Tu peux ouvrir chaque dossier quand tu veux."/>
+        <div className="panel backup-panel">
+          <h3>Sauvegarde générale du site</h3>
+          <p className="muted">Cette sauvegarde contient tout : utilisateurs, cahiers, devis, sauvegardes journalières et archives. À faire régulièrement.</p>
+          <div className="actions">
+            <button className="primary" onClick={exportFullBackup}><Save/>Télécharger sauvegarde générale</button>
+            <label className="upload backup-upload"><Archive/>Restaurer une sauvegarde<input type="file" accept="application/json,.json" onChange={(e)=>restoreFullBackup(e.target.files?.[0])}/></label>
+          </div>
+        </div>
+        <div className="actions top-actions"><button className="primary" onClick={()=>commit(closeDay(data,today()))}><Save/>Sauvegarder / clôturer aujourd’hui</button></div>
+        <div className="cards">{data.archivesJour.map(a=><article className="fiche-card" key={a.id}><h3>Dossier du {a.date}</h3><p>{a.fiches.length} fiche(s) · {a.devis.length} devis détaillé(s)</p><div className="mini-pieces">{a.resume.map(r=><span key={r.userId}>{r.nom}: {r.fiches} fiches / {r.devis} devis</span>)}</div><div className="actions"><button onClick={()=>setArchiveOpen(a)}><Eye/>Ouvrir le dossier</button><button onClick={()=>printArchiveJour(a)}><Printer/>Imprimer résumé</button></div></article>)}</div></section>}
+
+      {active==="users"&&currentUser.role==="admin"&&<section><Header title="Utilisateurs" subtitle="Créer et supprimer les comptes salariés."/><div className="user-grid"><div className="panel"><h3>Créer utilisateur</h3><input placeholder="Nom" value={userForm.nom} onChange={e=>setUserForm({...userForm,nom:e.target.value})}/><input placeholder="Identifiant" value={userForm.identifiant} onChange={e=>setUserForm({...userForm,identifiant:e.target.value})}/><input placeholder="Mot de passe" value={userForm.motDePasse} onChange={e=>setUserForm({...userForm,motDePasse:e.target.value})}/><select value={userForm.role} onChange={e=>setUserForm({...userForm,role:e.target.value})}><option value="salarie">Salarié</option><option value="admin">Admin</option></select><button className="primary" onClick={()=>{if(!userForm.nom||!userForm.identifiant||!userForm.motDePasse)return alert("Remplis tout.");commit({...data,users:[...data.users,{...userForm,id:uid()}]});setUserForm({nom:"",identifiant:"",motDePasse:"",role:"salarie"});}}><Plus/>Ajouter</button></div><div className="panel"><h3>Liste</h3>{data.users.map(u=><div className="user-row" key={u.id}><div><b>{u.nom}</b><small>{u.identifiant} · {u.role} · mot de passe : {u.motDePasse}</small></div>{u.id!==currentUser.id&&<button className="danger" onClick={()=>{if(confirm("Supprimer ?"))commit({...data,users:data.users.filter(x=>x.id!==u.id)})}}><Trash2/>Supprimer</button>}</div>)}</div></div></section>}
+
+      {preview&&<PreviewModal fiche={preview} close={()=>setPreview(null)} send={()=>sendToDevis(preview)}/>}
+      {archiveOpen&&<ArchiveModal archive={archiveOpen} close={()=>setArchiveOpen(null)}/>}
     </main>
   </div>;
 }
 
-function Login({ login, setLogin, connect }) { return <div className="login-page"><div className="login-card"><div className="brand"><img src={logo} /><div><h1>{ENTREPRISE.nom}</h1><p>Cahier Pro synchronisé</p></div></div><form onSubmit={connect} className="login-form"><label>Identifiant<input value={login.identifiant} onChange={e => setLogin({ ...login, identifiant: e.target.value })} /></label><label>Mot de passe<input type="password" value={login.motDePasse} onChange={e => setLogin({ ...login, motDePasse: e.target.value })} /></label><button className="primary full">Connexion</button></form><div className="hint">Accès secours : mokrane/admin ou admin/admin</div></div></div>; }
-function Dashboard({ data, statsByUser, currentUser, newFiche, setEditing, setOpenPieceId, setActive }) { return <section><div className="hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(7,21,60,.92), rgba(7,21,60,.50)), url(${hero})` }}><div><h1>Cahier Pro</h1><p>Demandes en attente, recherches réalisées, envoi vers devis client et sauvegarde journalière à 19h.</p><button className="primary" onClick={newFiche}><Plus />Nouvelle demande</button></div></div>{currentUser.role === "admin" ? <><div className="stats"><div><Clock /><b>{data.fiches.filter(f => f.statut === "en_attente").length}</b><span>En attente</span></div><div><Edit3 /><b>{data.fiches.filter(f => f.statut === "en_cours").length}</b><span>En cours</span></div><div><CheckCircle2 /><b>{data.fiches.filter(f => f.statut === "realise").length}</b><span>Réalisés</span></div><div><Euro /><b>{money(data.devis.filter(d => isSameDay(d.date)).reduce((s, d) => s + totalDevis(d), 0))}</b><span>Total devis du jour</span></div></div><div className="panel"><h3>Suivi efficacité par salarié aujourd’hui</h3><div className="employee-table"><div className="employee-head"><span>Salarié</span><span>Fiches</span><span>Attente</span><span>Réalisés</span><span>Total devis</span></div>{statsByUser.map(s => <div className="employee-row" key={s.user.id}><b>{s.user.nom}</b><span>{s.fiches}</span><span>{s.attente}</span><span>{s.realise}</span><span>{money(s.total)}</span></div>)}</div></div></> : <div className="dashboard-grid employee-only"><div className="panel"><h3>Mes statistiques aujourd’hui</h3>{(() => { const f = data.fiches.filter(x => x.creeParId === currentUser.id && isSameDay(x.date)); const d = data.devis.filter(x => x.creeParId === currentUser.id && isSameDay(x.date)); return <div className="employee-personal-stats"><div><b>{f.length}</b><span>Mes fiches</span></div><div><b>{f.filter(x => x.statut === "en_attente").length}</b><span>En attente</span></div><div><b>{f.filter(x => x.statut === "realise").length}</b><span>Réalisés</span></div><div><b>{money(d.reduce((s, x) => s + totalDevis(x), 0))}</b><span>Total devis</span></div></div>; })()}</div><div className="panel"><h3>Mes demandes en attente</h3><div className="today-list">{data.fiches.filter(f => f.creeParId === currentUser.id && f.statut !== "realise" && f.date === today()).slice(0, 8).map(f => <button key={f.id} onClick={() => { setEditing(f); setOpenPieceId(f.pieces?.[0]?.id || ""); setActive("edition"); }}><span><b>{f.immatriculation || f.clientTelephone || "Sans plaque"}</b><small>{f.date} {f.heureCreation} · {f.statut}</small></span><strong>{f.pieces?.length || splitPieces(f.demandeRapide).length} pièce(s)</strong></button>)}</div></div></div>}</section>; }
-function CahierPro({ currentUser, selectedUserId, setSelectedUserId, data, search, setSearch, visibleFiches, newFiche, setEditing, setOpenPieceId, setActive, setPreview, commit, canEdit, canDelete }) { return <section><Header title="Cahier Pro" subtitle={currentUser.role === "admin" ? "Admin : cahiers du jour. Recherche plaque/VIN/nom pour retrouver l’historique." : "Salarié : ton cahier du jour uniquement. Recherche plaque pour retrouver une fiche déjà faite."} /><div className="toolbar"><div className="search"><Search /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom, téléphone..." /></div>{currentUser.role === "admin" ? <select value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)}><option value="all">Tous les cahiers</option>{data.users.map(u => <option key={u.id} value={u.id}>Cahier de {u.nom}</option>)}</select> : <div className="locked-filter">Mon cahier</div>}<button className="primary" onClick={newFiche}><Plus />Nouvelle</button></div><div className="cards">{visibleFiches.map(f => <article className="fiche-card" key={f.id}><div className="card-top"><div><b>{f.numero}</b><small>{f.date} {f.heureCreation} · {f.creeParNom}</small></div><span className={`badge ${f.statut}`}>{f.statut === "realise" ? "Réalisé" : f.statut === "en_cours" ? "En cours" : "En attente"}</span></div><h3>{f.clientNom || "Client non renseigné"}</h3><p><Car size={16} />{f.immatriculation || "Plaque non renseignée"} — {vehicleName(f) || "Véhicule non renseigné"}</p><div className="mini-pieces">{((f.pieces || []).length ? f.pieces : splitPieces(f.demandeRapide).map(x => ({ id: x, designation: x }))).slice(0, 5).map(p => <span key={p.id}>{p.designation}</span>)}</div>{currentUser.role !== "admin" && f.creeParId !== currentUser.id && <div className="external-warning">Fiche déjà faite par {f.creeParNom}. Consultation par plaque uniquement.</div>}<div className="actions"><button onClick={() => setPreview(f)}><Eye />Afficher l’intégralité</button>{canEdit(f) && <button onClick={() => { setEditing(f); setOpenPieceId(f.pieces?.[0]?.id || ""); setActive("edition"); }}><Edit3 />Ouvrir</button>}{canDelete() && <button className="danger" onClick={() => { if (confirm("Supprimer ?")) commit({ ...data, fiches: data.fiches.filter(x => x.id !== f.id) }); }}><Trash2 />Supprimer</button>}</div></article>)}</div></section>; }
-function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, sendToDevis, setPreview, cancel }) { const piece = (editing.pieces || []).find(p => p.id === openPieceId); function setField(k, v) { setEditing({ ...editing, [k]: v }); } function upPiece(id, patch) { setEditing({ ...editing, pieces: (editing.pieces || []).map(p => p.id === id ? { ...p, ...patch } : p) }); } function upProp(pid, idx, patch) { setEditing({ ...editing, pieces: (editing.pieces || []).map(p => { if (p.id !== pid) return p; const props = [...(p.propositions || [])]; props[idx] = { ...(props[idx] || propEmpty(idx + 1)), ...patch }; return { ...p, propositions: props }; }) }); } function addProp(pid) { setEditing({ ...editing, pieces: (editing.pieces || []).map(p => p.id === pid ? { ...p, propositions: [...(p.propositions || []), propEmpty((p.propositions || []).length + 1)] } : p) }); } function remProp(pid, idx) { setEditing({ ...editing, pieces: (editing.pieces || []).map(p => { if (p.id !== pid) return p; if ((p.propositions || []).length <= 1) { alert("Minimum une proposition."); return p; } return { ...p, propositions: p.propositions.filter((_, i) => i !== idx).map((pr, i) => ({ ...pr, numero: i + 1 })) }; }) }); } function img(file, pid, idx) { const r = new FileReader(); r.onload = () => upProp(pid, idx, { image: r.result }); r.readAsDataURL(file); } function prepare() { const names = splitPieces(editing.demandeRapide); if (!names.length) return alert("Écris la liste de pièces."); const existing = (editing.pieces || []).map(p => p.designation.toLowerCase()); const newPieces = names.filter(n => !existing.includes(n.toLowerCase())).map(n => emptyPiece(n)); const pieces = [...(editing.pieces || []), ...newPieces]; setEditing({ ...editing, pieces, statut: "en_cours" }); setOpenPieceId(pieces[0]?.id || ""); }
-  return <section><Header title="Cahier Pro — recherche" subtitle="En attente quand la demande arrive, En cours pendant la recherche, Réalisé quand envoyé vers Devis." /><div className="editor"><div className="panel"><h3>Informations client / véhicule</h3><div className="grid2"><label>Numéro<input value={editing.numero} onChange={e => setField("numero", e.target.value)} /></label><label>Date<input type="date" value={editing.date} onChange={e => setField("date", e.target.value)} /></label><label>Heure<input value={editing.heureCreation || ""} onChange={e => setField("heureCreation", e.target.value)} /></label><label>Statut<select value={editing.statut} onChange={e => setField("statut", e.target.value)}><option value="en_attente">En attente</option><option value="en_cours">En cours</option><option value="realise">Réalisé</option></select></label><label>Nom client<input value={editing.clientNom} onChange={e => setField("clientNom", e.target.value)} /></label><label>Téléphone<input value={editing.clientTelephone} onChange={e => setField("clientTelephone", e.target.value)} /></label><label>Immatriculation<input value={editing.immatriculation} onChange={e => setField("immatriculation", e.target.value.toUpperCase())} /></label><label>VIN<input maxLength="17" value={editing.vin} onChange={e => setField("vin", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} /></label><label>Marque automatique<select value={editing.marque} onChange={e => setEditing({ ...editing, marque: e.target.value, modele: "" })}><option value="">Sélectionner</option>{CAR_BRANDS.map(m => <option key={m}>{m}</option>)}</select></label><label>Modèle automatique<select value={editing.modele} disabled={!editing.marque} onChange={e => setField("modele", e.target.value)}><option value="">Sélectionner</option>{(CAR_MODELS[editing.marque] || []).map(m => <option key={m}>{m}</option>)}</select></label><label>Marque manuelle<input value={editing.marqueManuelle || ""} onChange={e => setField("marqueManuelle", e.target.value)} /></label><label>Modèle manuel<input value={editing.modeleManuel || ""} onChange={e => setField("modeleManuel", e.target.value)} /></label><label>Finition / motorisation<input value={editing.finition} onChange={e => setField("finition", e.target.value)} /></label></div></div><div className="panel demande-client"><div className="line-title"><div><h3>Demande rapide</h3><p className="muted">Liste donnée par le client, une pièce par ligne.</p></div><button onClick={prepare}><ClipboardList />Commencer la recherche</button></div><textarea className="big-request" value={editing.demandeRapide} onChange={e => setField("demandeRapide", e.target.value)} placeholder={"Kit embrayage\nKit distribution\nFiltre à air\nFiltre à huile"} /></div><div className="panel"><div className="line-title"><h3>Recherche détaillée</h3><button onClick={() => { const p = emptyPiece(""); setEditing({ ...editing, pieces: [...(editing.pieces || []), p], statut: "en_cours" }); setOpenPieceId(p.id); }}><Plus />Ajouter pièce</button></div><div className="request-preview">{(editing.pieces || []).map((p, i) => <button key={p.id} className={openPieceId === p.id ? "tab-on" : ""} onClick={() => setOpenPieceId(p.id)}>{i + 1}. {p.designation || "Pièce sans nom"}</button>)}</div>{!piece ? <div className="waiting-panel">Clique sur “Commencer la recherche” ou “Ajouter pièce”.</div> : <div className="piece-box"><div className="piece-head"><b>{piece.designation || "Pièce"}</b><button className="danger" onClick={() => { const rest = editing.pieces.filter(p => p.id !== piece.id); setEditing({ ...editing, pieces: rest }); setOpenPieceId(rest[0]?.id || ""); }}><Trash2 /></button></div><div className="grid2"><label>Nom pièce<input value={piece.designation} onChange={e => upPiece(piece.id, { designation: e.target.value })} /></label><label>Quantité<input type="number" value={piece.quantite || 1} onChange={e => upPiece(piece.id, { quantite: e.target.value })} /></label></div><div className="line-title proposition-toolbar"><div><h4>Propositions</h4><small>Prix en TTC. Les références ne sortent pas sur le devis client.</small></div><button onClick={() => addProp(piece.id)}><Plus />Ajouter proposition</button></div><div className="two-proposals">{(piece.propositions || []).map((pr, idx) => <div className={`simple-proposal ${pr.selectionnee ? "selected-proposal" : ""}`} key={pr.id}><div className="proposal-head"><b>Proposition {idx + 1}</b><div className="proposal-head-actions"><label className="radio-choice"><input type="checkbox" checked={!!pr.selectionnee} onChange={e => upProp(piece.id, idx, { selectionnee: e.target.checked })} />Sélectionner</label>{(piece.propositions || []).length > 1 && <button className="danger" onClick={() => remProp(piece.id, idx)}><Trash2 />Supprimer</button>}</div></div><div className="grid2"><label>Référence<input value={pr.reference || ""} onChange={e => upProp(piece.id, idx, { reference: e.target.value })} /></label><label>Marque / fournisseur<input value={pr.marque || ""} onChange={e => upProp(piece.id, idx, { marque: e.target.value })} /></label><label>Prix TTC<input type="number" value={pr.prix || ""} onChange={e => upProp(piece.id, idx, { prix: e.target.value })} /></label><label>Note<input value={pr.note || ""} onChange={e => upProp(piece.id, idx, { note: e.target.value })} /></label></div><div className="image-line proposition-image-line">{pr.image ? <img src={pr.image} /> : <div className="empty-img"><ImagePlus />Image réf.</div>}<label className="upload"><ImagePlus />Ajouter image<input type="file" accept="image/*" onChange={e => e.target.files?.[0] && img(e.target.files[0], piece.id, idx)} /></label>{pr.image && <button className="danger" onClick={() => upProp(piece.id, idx, { image: "" })}><Trash2 />Retirer</button>}</div></div>)}</div></div>}</div><div className="bottom-actions"><button onClick={cancel}><X />Retour</button><button onClick={() => saveFiche(editing, "en_attente")}><Clock />Mettre en attente</button><button onClick={() => setPreview(editing)}><Eye />Afficher l’intégralité du devis</button><button className="primary" onClick={() => saveFiche({ ...editing, statut: editing.statut === "en_attente" ? "en_cours" : editing.statut })}><Save />Enregistrer dans le cahier</button><button onClick={() => sendToDevis({ ...editing, statut: "realise" })}><Send />Envoyer vers devis</button></div></div></section>;
-}
-function DevisView({ visibleDevis, search, setSearch }) { return <section><Header title="Devis" subtitle="Devis client imprimable, sans références internes." /><div className="toolbar one"><div className="search"><Search /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom..." /></div></div><div className="cards">{visibleDevis.map(d => <article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className="badge realise">Devis client</span></div><h3>{d.clientNom || "Client non renseigné"}</h3><p><Car size={16} />{d.immatriculation || "Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes || []).slice(0, 5).map(l => <span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><div className="actions"><button onClick={() => printDevisClient(d)}><Printer />Imprimer devis</button></div></article>)}</div></section>; }
-function Sauvegardes({ data, commit }) { return <section><Header title="Sauvegardes journalières" subtitle="À 19h si le site est ouvert, une sauvegarde du jour est créée. Le lendemain, le Cahier Pro affiche une journée vide, mais la recherche retrouve l’historique." /><div className="actions top-actions"><button className="primary" onClick={() => commit(closeDay(data, today()))}><Save />Sauvegarder aujourd’hui</button></div><div className="cards">{(data.archivesJour || []).map(a => <article className="fiche-card" key={a.id}><h3>Sauvegarde du {a.date}</h3><p>{a.fiches.length} fiche(s) · {a.devis.length} devis</p><div className="mini-pieces">{a.resume.map(r => <span key={r.userId}>{r.nom} : {r.fiches} fiches / {r.devis} devis</span>)}</div><button onClick={() => printArchiveJour(a)}><Printer />Imprimer archive jour</button></article>)}</div></section>; }
-function UsersView({ data, commit, currentUser, userForm, setUserForm }) { return <section><Header title="Utilisateurs" subtitle="Créer/supprimer les comptes salariés." /><div className="user-grid"><div className="panel"><h3>Créer utilisateur</h3><input placeholder="Nom" value={userForm.nom} onChange={e => setUserForm({ ...userForm, nom: e.target.value })} /><input placeholder="Identifiant" value={userForm.identifiant} onChange={e => setUserForm({ ...userForm, identifiant: e.target.value })} /><input placeholder="Mot de passe" value={userForm.motDePasse} onChange={e => setUserForm({ ...userForm, motDePasse: e.target.value })} /><select value={userForm.role} onChange={e => setUserForm({ ...userForm, role: e.target.value })}><option value="salarie">Salarié</option><option value="admin">Admin</option></select><button className="primary" onClick={() => { if (!userForm.nom || !userForm.identifiant || !userForm.motDePasse) return alert("Remplis tout."); commit({ ...data, users: [...data.users, { ...userForm, id: uid() }] }); setUserForm({ nom: "", identifiant: "", motDePasse: "", role: "salarie" }); }}><Plus />Ajouter</button></div><div className="panel"><h3>Liste</h3>{data.users.map(u => <div className="user-row" key={u.id}><div><b>{u.nom}</b><small>{u.identifiant} · {u.role} · mot de passe : {u.motDePasse}</small></div>{u.id !== currentUser.id && <button className="danger" onClick={() => { if (confirm("Supprimer ?")) commit({ ...data, users: data.users.filter(x => x.id !== u.id) }); }}><Trash2 />Supprimer</button>}</div>)}</div></div></section>; }
-function PreviewModal({ fiche, onClose, sendToDevis }) { return <div className="modal-back"><div className="modal"><div className="line-title"><h2>Aperçu intégral — {fiche.numero}</h2><button onClick={onClose}><X /></button></div><div className="preview-info"><b>{fiche.clientNom || "Client non renseigné"}</b><span>{fiche.immatriculation || "Sans plaque"} · {vehicleName(fiche)} · {fiche.statut}</span></div><table className="preview-table"><thead><tr><th>Pièce</th><th>Qté</th><th>Propositions sélectionnées</th><th>Total TTC</th></tr></thead><tbody>{(fiche.pieces || []).map(p => <tr key={p.id}><td>{p.designation}</td><td>{p.quantite || 1}</td><td>{selectedProps(p).map((pr, i) => <div key={pr.id}>Prop. {i + 1} : {pr.reference} · {pr.marque} · {money(pr.prix)}</div>)}</td><td>{money(selectedProps(p).reduce((s, pr) => s + Number(pr.prix || 0) * Number(p.quantite || 1), 0))}</td></tr>)}</tbody></table><div className="preview-total">Total sélectionné : {money(totalFiche(fiche))}</div><div className="actions"><button onClick={sendToDevis}><Send />Envoyer vers devis</button></div></div></div>; }
+function ListResume({items, open}){ return <div className="today-list">{items.map(f=><button key={f.id} onClick={()=>open(f)}><span><b>{f.immatriculation||f.clientTelephone||"Sans plaque"}</b><small>{f.date} {f.heureCreation} · {f.statut}</small></span><strong>{f.pieces?.length||splitPieces(f.demandeRapide).length} pièce(s)</strong></button>)}</div>; }
 
-function printDevisClient(d) { const rows = (d.lignes || []).map((l, i) => { const lineTTC = Number(l.quantite || 1) * Number(l.prixTTC || 0); return `<tr><td>${i + 1}</td><td>${l.designation || ""}</td><td>${l.quantite || 1}</td><td>${money(ttcToHt(l.prixTTC))}</td><td>${money(l.prixTTC)}</td><td>${money(lineTTC)}</td></tr>`; }).join(""); const totalTTC = totalDevis(d); const totalHT = ttcToHt(totalTTC); const tva = ttcToTva(totalTTC); const w = window.open("", "_blank"); w.document.write(`<html><head><title>${d.numero}</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#08245c;margin:0}.page{width:100%;min-height:277mm;padding:0 8mm;position:relative}.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:4px solid #0d47a1;padding:0 0 10px}.brand{display:flex;gap:12px;align-items:flex-start}.brand img{width:78px;height:78px;object-fit:contain}.brand h1{margin:0;color:#0d47a1;font-size:28px;letter-spacing:.5px}.brand div{font-size:11px;line-height:1.5;font-weight:700}.title{text-align:right;color:#0d47a1}.title h2{margin:6px 0 8px;font-size:30px}.title b{font-size:12px}.boxes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}.box{border:1px solid #9fc2f7;border-radius:10px;min-height:92px;padding:12px}.box h3,.detail h3{margin:0 0 8px;color:#0d47a1;font-size:15px}.box p{margin:3px 0;font-size:12px}.detail{border:1px solid #9fc2f7;border-radius:10px;margin-top:14px;padding:10px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#0d47a1;color:white;text-align:left;padding:8px}td{border:1px solid #c7daf8;padding:7px;color:#08245c}.totals{position:absolute;right:8mm;bottom:35mm;width:330px;border:1px solid #c7daf8;border-radius:10px;overflow:hidden;font-size:12px}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #c7daf8;font-weight:800}.totals .remise{color:#d00000}.totals .grand{background:#000;color:#fff;font-size:18px}.footer{position:absolute;left:8mm;right:8mm;bottom:8mm;text-align:center;border-top:3px solid #0d47a1;padding-top:8px;font-size:10px;color:#0d47a1;line-height:1.5}</style></head><body><div class="page"><div class="header"><div class="brand"><img src="${logo}"><div><h1>${ENTREPRISE.nom}</h1><div>📍 ${ENTREPRISE.adresse}</div><div>✉️ ${ENTREPRISE.email}</div><div>☎ ${ENTREPRISE.tel} — WhatsApp ${ENTREPRISE.whatsapp}</div></div></div><div class="title"><h2>DEVIS</h2><b>N° : ${d.numero}</b><br><b>Date : ${d.date}</b></div></div><div class="boxes"><div class="box"><h3>Client</h3><p><b>Nom :</b> ${d.clientNom || ""}</p><p><b>Téléphone :</b> ${d.clientTelephone || ""}</p></div><div class="box"><h3>Véhicule</h3><p><b>Marque :</b> ${d.vehicule || ""}</p><p><b>Immatriculation :</b> ${d.immatriculation || ""}</p><p><b>VIN :</b> ${d.vin || ""}</p></div></div><div class="detail"><h3>Détail du devis</h3><table><thead><tr><th>N°</th><th>Désignation</th><th>Quantité</th><th>Prix HT</th><th>Prix TTC</th><th>Total TTC</th></tr></thead><tbody>${rows}</tbody></table></div><div class="totals"><div><span>Sous-total HT</span><b>${money(totalHT)}</b></div><div class="remise"><span>Remise HT</span><b>-0.00 €</b></div><div><span>Total HT</span><b>${money(totalHT)}</b></div><div><span>TVA ${ENTREPRISE.tauxTva}%</span><b>${money(tva)}</b></div><div class="grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div></div><div class="footer">${ENTREPRISE.nom} — ${ENTREPRISE.adresse}<br>Email : ${ENTREPRISE.email} — Téléphone : ${ENTREPRISE.tel} — WhatsApp : ${ENTREPRISE.whatsapp}<br>TVA : ${ENTREPRISE.tva}</div></div><script>window.print()</script></body></html>`); w.document.close(); }
-function printArchiveJour(a) { const rows = (a.resume || []).map(r => `<tr><td>${r.nom}</td><td>${r.fiches}</td><td>${r.devis}</td><td>${money(r.total)}</td></tr>`).join(""); const w = window.open("", "_blank"); w.document.write(`<html><body><h1>Archive journée ${a.date}</h1><table border="1" cellpadding="8"><tr><th>Salarié</th><th>Fiches</th><th>Devis</th><th>Total</th></tr>${rows}</table><script>window.print()</script></body></html>`); w.document.close(); }
+function FicheCard({f,currentUser,canEdit,canDelete,open,preview,del}){
+  return <article className="fiche-card"><div className="card-top"><div><b>{f.numero}</b><small>{f.date} {f.heureCreation} · {f.creeParNom}</small></div><span className={`badge ${f.statut}`}>{f.statut==="realise"?"Réalisé":f.statut==="en_cours"?"En cours":"En attente"}</span></div><h3>{f.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{f.immatriculation||"Plaque non renseignée"} — {vehicleName(f)||"Véhicule non renseigné"}</p><div className="mini-pieces">{((f.pieces||[]).length?f.pieces:splitPieces(f.demandeRapide).map(x=>({id:x,designation:x}))).slice(0,5).map(p=><span key={p.id}>{p.designation}</span>)}</div>{currentUser.role!=="admin"&&f.creeParId!==currentUser.id&&<div className="external-warning">Fiche déjà faite par {f.creeParNom}. Consultation par plaque uniquement.</div>}<div className="actions"><button onClick={preview}><Eye/>Afficher l’intégralité</button>{canEdit&&<button onClick={open}><Edit3/>Ouvrir</button>}{canDelete&&<button className="danger" onClick={del}><Trash2/>Supprimer</button>}</div></article>;
+}
+
+function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, sendToDevis, setPreview, cancel }){
+  const piece=(editing.pieces||[]).find(p=>p.id===openPieceId);
+  function setField(k,v){ setEditing({...editing,[k]:v}); }
+  function updatePiece(id,patch){ setEditing({...editing,pieces:(editing.pieces||[]).map(p=>p.id===id?{...p,...patch}:p)}); }
+  function updateProp(pid,idx,patch){ setEditing({...editing,pieces:(editing.pieces||[]).map(p=>{if(p.id!==pid)return p;const props=[...(p.propositions||[])];props[idx]={...(props[idx]||propositionEmpty(idx+1)),...patch};return {...p,propositions:props};})}); }
+  function toggleProp(pid,idx,checked){ updateProp(pid,idx,{selectionnee:checked}); }
+  function addProp(pid){ setEditing({...editing,pieces:(editing.pieces||[]).map(p=>p.id===pid?{...p,propositions:[...(p.propositions||[]),propositionEmpty((p.propositions||[]).length+1)]}:p)}); }
+  function removeProp(pid,idx){ setEditing({...editing,pieces:(editing.pieces||[]).map(p=>{if(p.id!==pid)return p;if((p.propositions||[]).length<=1){alert("Minimum une proposition.");return p;}return {...p,propositions:p.propositions.filter((_,i)=>i!==idx).map((pr,i)=>({...pr,numero:i+1}))};})}); }
+  function imageProp(file,pid,idx){ const r=new FileReader(); r.onload=()=>updateProp(pid,idx,{image:r.result}); r.readAsDataURL(file); }
+  function prepare(){ const names=splitPieces(editing.demandeRapide); if(!names.length)return alert("Écris la liste de pièces."); const ex=(editing.pieces||[]).map(p=>p.designation.toLowerCase()); const newP=names.filter(n=>!ex.includes(n.toLowerCase())).map(n=>emptyPiece(n)); const pieces=[...(editing.pieces||[]),...newP]; setEditing({...editing,pieces,statut:"en_cours"}); setOpenPieceId(pieces[0]?.id||""); }
+  return <section><Header title="Cahier Pro — recherche" subtitle="Mise en attente sous la demande rapide, puis recherche et envoi vers devis."/><div className="editor"><div className="panel"><h3>Informations client / véhicule</h3><div className="grid2"><label>Numéro<input value={editing.numero} onChange={e=>setField("numero",e.target.value)}/></label><label>Date<input type="date" value={editing.date} onChange={e=>setField("date",e.target.value)}/></label><label>Heure<input value={editing.heureCreation||""} onChange={e=>setField("heureCreation",e.target.value)}/></label><label>Statut<select value={editing.statut} onChange={e=>setField("statut",e.target.value)}><option value="en_attente">En attente</option><option value="en_cours">En cours</option><option value="realise">Réalisé</option></select></label><label>Nom client<input value={editing.clientNom} onChange={e=>setField("clientNom",e.target.value)}/></label><label>Téléphone<input value={editing.clientTelephone} onChange={e=>setField("clientTelephone",e.target.value)}/></label><label>Immatriculation<input value={editing.immatriculation} onChange={e=>setField("immatriculation",e.target.value.toUpperCase())}/></label><label>VIN<input maxLength="17" value={editing.vin} onChange={e=>setField("vin",e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""))}/></label><label>Marque automatique<select value={editing.marque} onChange={e=>setEditing({...editing,marque:e.target.value,modele:""})}><option value="">Sélectionner</option>{CAR_BRANDS.map(m=><option key={m}>{m}</option>)}</select></label><label>Modèle automatique<select value={editing.modele} disabled={!editing.marque} onChange={e=>setField("modele",e.target.value)}><option value="">Sélectionner</option>{(CAR_MODELS[editing.marque]||[]).map(m=><option key={m}>{m}</option>)}</select></label><label>Marque manuelle<input value={editing.marqueManuelle||""} onChange={e=>setField("marqueManuelle",e.target.value)}/></label><label>Modèle manuel<input value={editing.modeleManuel||""} onChange={e=>setField("modeleManuel",e.target.value)}/></label><label>Finition / motorisation<input value={editing.finition} onChange={e=>setField("finition",e.target.value)}/></label></div></div><div className="panel demande-client"><div className="line-title"><div><h3>Demande rapide</h3><p className="muted">Liste donnée par le client, une pièce par ligne.</p></div><button onClick={prepare}><ClipboardList/>Commencer la recherche</button></div><textarea className="big-request" value={editing.demandeRapide} onChange={e=>setField("demandeRapide",e.target.value)} placeholder={"Kit embrayage\nKit distribution\nFiltre à air\nFiltre à huile"}/><div className="quick-actions"><button className="primary" onClick={()=>saveFiche({...editing,statut:"en_attente"})}><Clock/>Mettre en attente</button><button onClick={()=>setField("demandeRapide","")}><X/>Vider</button></div></div><div className="panel"><div className="line-title"><h3>Recherche détaillée</h3><button onClick={()=>{const p=emptyPiece("");setEditing({...editing,pieces:[...(editing.pieces||[]),p],statut:"en_cours"});setOpenPieceId(p.id)}}><Plus/>Ajouter pièce</button></div><div className="request-preview">{(editing.pieces||[]).map((p,i)=><button key={p.id} className={openPieceId===p.id?"tab-on":""} onClick={()=>setOpenPieceId(p.id)}>{i+1}. {p.designation||"Pièce sans nom"}</button>)}</div>{!piece?<div className="waiting-panel">Clique sur “Commencer la recherche”.</div>:<div className="piece-box"><div className="piece-head"><b>{piece.designation}</b><button className="danger" onClick={()=>{const rest=editing.pieces.filter(p=>p.id!==piece.id);setEditing({...editing,pieces:rest});setOpenPieceId(rest[0]?.id||"")}}><Trash2/></button></div><div className="grid2"><label>Nom pièce<input value={piece.designation} onChange={e=>updatePiece(piece.id,{designation:e.target.value})}/></label><label>Quantité<input type="number" value={piece.quantite||1} onChange={e=>updatePiece(piece.id,{quantite:e.target.value})}/></label></div><div className="line-title proposition-toolbar"><div><h4>Propositions</h4><small>Prix saisi en TTC. Les références ne sortent pas sur le devis client.</small></div><button onClick={()=>addProp(piece.id)}><Plus/>Ajouter proposition</button></div><div className="two-proposals">{(piece.propositions||[]).map((pr,idx)=><div className={`simple-proposal ${pr.selectionnee?"selected-proposal":""}`} key={pr.id}><div className="proposal-head"><b>Proposition {idx+1}</b><div className="proposal-head-actions"><label className="radio-choice"><input type="checkbox" checked={!!pr.selectionnee} onChange={e=>toggleProp(piece.id,idx,e.target.checked)}/>Sélectionner</label>{(piece.propositions||[]).length>1&&<button className="danger" onClick={()=>removeProp(piece.id,idx)}><Trash2/>Supprimer</button>}</div></div><div className="grid2"><label>Référence<input value={pr.reference||""} onChange={e=>updateProp(piece.id,idx,{reference:e.target.value})}/></label><label>Marque / fournisseur<input value={pr.marque||""} onChange={e=>updateProp(piece.id,idx,{marque:e.target.value})}/></label><label>Prix TTC<input type="number" value={pr.prix||""} onChange={e=>updateProp(piece.id,idx,{prix:e.target.value})}/></label><label>Note<input value={pr.note||""} onChange={e=>updateProp(piece.id,idx,{note:e.target.value})}/></label></div><div className="image-line proposition-image-line">{pr.image?<img src={pr.image}/>:<div className="empty-img"><ImagePlus/>Image réf.</div>}<label className="upload"><ImagePlus/>Ajouter image<input type="file" accept="image/*" onChange={e=>e.target.files?.[0]&&imageProp(e.target.files[0],piece.id,idx)}/></label>{pr.image&&<button className="danger" onClick={()=>updateProp(piece.id,idx,{image:""})}><Trash2/>Retirer</button>}</div></div>)}</div></div>}</div><div className="bottom-actions"><button onClick={cancel}><X/>Retour</button><button onClick={()=>setPreview(editing)}><Eye/>Afficher l’intégralité du devis</button><button className="primary" onClick={()=>saveFiche({...editing,statut: isRechercheTerminee(editing) ? "realise" : "en_cours"})}><Save/>Enregistrer dans le cahier</button><button onClick={()=>sendToDevis({...editing,statut:"realise"})}><Send/>Envoyer vers devis</button></div></div></section>;
+}
+
+function PreviewModal({fiche, close, send}){ return <div className="modal-back"><div className="modal"><div className="line-title"><h2>Aperçu intégral — {fiche.numero}</h2><button onClick={close}><X/></button></div><div className="preview-info"><b>{fiche.clientNom}</b><span>{fiche.immatriculation} · {vehicleName(fiche)} · {fiche.statut}</span></div><table className="preview-table"><thead><tr><th>Pièce</th><th>Qté</th><th>Propositions sélectionnées</th><th>Total TTC</th></tr></thead><tbody>{(fiche.pieces||[]).map(p=><tr key={p.id}><td>{p.designation}</td><td>{p.quantite||1}</td><td>{selectedProps(p).map((pr,i)=><div key={pr.id}>Prop. {i+1} : {pr.reference} · {pr.marque} · {money(pr.prix)}</div>)}</td><td>{money(selectedProps(p).reduce((s,pr)=>s+Number(pr.prix||0)*Number(p.quantite||1),0))}</td></tr>)}</tbody></table><div className="preview-total">Total sélectionné : {money(totalFiche(fiche))}</div><div className="actions"><button onClick={send}><Send/>Envoyer vers devis</button></div></div></div>; }
+function ArchiveModal({archive, close}){ return <div className="modal-back"><div className="modal large"><div className="line-title"><h2>Dossier sauvegarde du {archive.date}</h2><button onClick={close}><X/></button></div><h3>Résumé</h3><div className="employee-table"><div className="employee-head"><span>Salarié</span><span>Fiches</span><span>Devis</span><span>Total</span></div>{archive.resume.map(r=><div className="employee-row" key={r.userId}><b>{r.nom}</b><span>{r.fiches}</span><span>{r.devis}</span><span>{money(r.total)}</span></div>)}</div><h3>Devis détaillés</h3><div className="cards">{archive.devis.map(d=><article className="fiche-card" key={d.id}><b>{d.numero}</b><small>{d.clientNom} · {d.immatriculation}</small><div className="mini-pieces">{(d.lignes||[]).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer</button></article>)}</div><h3>Fiches du cahier</h3><div className="cards">{archive.fiches.map(f=><article className="fiche-card" key={f.id}><b>{f.numero}</b><small>{f.clientNom} · {f.immatriculation} · {f.statut}</small><div className="mini-pieces">{(f.pieces||[]).map(p=><span key={p.id}>{p.designation}</span>)}</div></article>)}</div></div></div>; }
+
+function printDevisClient(d){
+  const rows=(d.lignes||[]).map((l,i)=>{const unit=Number(l.prixTTC||0), q=Number(l.quantite||1), ht=htFromTtc(unit), tva=tvaFromTtc(unit), total=q*unit; return `<tr><td>${i+1}</td><td>${l.designation||""}</td><td>${q}</td><td>${money(ht)}</td><td>${money(tva)}</td><td>${money(unit)}</td><td>${money(total)}</td></tr>`;}).join("");
+  const totalTTC=totalDevis(d), totalHT=htFromTtc(totalTTC), totalTVA=tvaFromTtc(totalTTC);
+  const w=window.open("","_blank");
+  w.document.write(`<html><head><title>${d.numero}</title><style>@page{size:A4;margin:12mm}body{font-family:Arial;color:#0b1b45}.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:4px solid #123f91;padding-bottom:12px}.brand{display:flex;gap:12px;align-items:center}.brand img{width:72px}.brand h1{font-size:26px;margin:0;color:#123f91}.doc-title{text-align:right}.doc-title h2{font-size:28px;margin:0;color:#123f91}.info{font-size:12px;line-height:1.4}.boxes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.box{border:1px solid #bdd1f2;border-radius:10px;padding:12px;min-height:90px}.box h3{margin:0 0 8px;color:#123f91;font-size:16px}table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}th{background:#123f91;color:#fff;text-align:left;padding:9px}td{border:1px solid #cbd8ee;padding:8px}.totals{margin-top:220px;margin-left:auto;width:310px;border:1px solid #cbd8ee;border-radius:10px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #cbd8ee;font-weight:700}.totals .grand{background:#000;color:#fff;font-size:18px}.footer{position:fixed;bottom:10mm;left:12mm;right:12mm;text-align:center;border-top:3px solid #123f91;padding-top:8px;font-size:11px}</style></head><body><div class="top"><div class="brand"><img src="${logo}"><div><h1>${ENTREPRISE.nom}</h1><div class="info">📍 ${ENTREPRISE.adresse}<br>✉️ ${ENTREPRISE.email}<br>☎️ ${ENTREPRISE.tel} — WhatsApp ${ENTREPRISE.whatsapp}</div></div></div><div class="doc-title"><h2>DEVIS</h2><b>N° : ${d.numero}</b><br><b>Date : ${d.date}</b></div></div><div class="boxes"><div class="box"><h3>Client</h3><b>Nom :</b> ${d.clientNom||""}<br><b>Téléphone :</b> ${d.clientTelephone||""}</div><div class="box"><h3>Véhicule</h3><b>Marque / modèle :</b> ${d.vehicule||""}<br><b>Immatriculation :</b> ${d.immatriculation||""}<br><b>VIN :</b> ${d.vin||""}</div></div><div class="box" style="margin-top:12px"><h3>Détail du devis</h3><table><thead><tr><th>N°</th><th>Désignation</th><th>Quantité</th><th>Prix HT</th><th>TVA</th><th>Prix TTC</th><th>Total TTC</th></tr></thead><tbody>${rows}</tbody></table></div><div class="totals"><div><span>Total HT</span><b>${money(totalHT)}</b></div><div><span>TVA 20%</span><b>${money(totalTVA)}</b></div><div class="grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div></div><div class="footer">${ENTREPRISE.nom} — ${ENTREPRISE.adresse}<br>Email : ${ENTREPRISE.email} — Téléphone : ${ENTREPRISE.tel} — WhatsApp : ${ENTREPRISE.whatsapp}<br>TVA : ${ENTREPRISE.tvaNumber}</div><script>window.print()</script></body></html>`);
+  w.document.close();
+}
+function printArchiveJour(a){ const rows=a.resume.map(r=>`<tr><td>${r.nom}</td><td>${r.fiches}</td><td>${r.devis}</td><td>${money(r.total)}</td></tr>`).join(""); const w=window.open("","_blank"); w.document.write(`<html><body><h1>Archive journée ${a.date}</h1><table border="1" cellpadding="8"><tr><th>Salarié</th><th>Fiches</th><th>Devis</th><th>Total</th></tr>${rows}</table><script>window.print()</script></body></html>`); w.document.close(); }
 
 createRoot(document.getElementById("root")).render(<App />);

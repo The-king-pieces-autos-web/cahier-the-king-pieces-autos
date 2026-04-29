@@ -1,6 +1,6 @@
 {
-  "name": "cahier-pro-v3-final",
-  "version": "3.0.0",
+  "name": "cahier-pro-v4-final",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,11 +9,11 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "latest",
     "@vitejs/plugin-react": "latest",
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "@supabase/supabase-js": "latest",
     "lucide-react": "latest"
   },
   "devDependencies": {}

@@ -29,7 +29,7 @@ export function subscribeCloudState(onChange) {
   if (!supabase) return null;
   return supabase
     .channel("app_state_global_sync")
-    .on("postgres_changes", { event: "*", schema: "public", table: "app_state", filter: "id=eq.global" }, payload => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "app_state", filter: "id=eq.global" }, (payload) => {
       if (payload?.new?.payload) onChange(payload.new.payload);
     })
     .subscribe();
