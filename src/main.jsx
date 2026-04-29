@@ -21,6 +21,7 @@ const ENTREPRISE = {
 };
 
 const LS_KEY = "tkpa_cahier_final_v1";
+const SESSION_KEY = "tkpa_current_user_id";
 
 const CAR_MODELS = {
   "Peugeot": ["106","107","108","206","207","208","307","308","407","508","2008","3008","5008","Partner","Expert","Boxer"],
@@ -176,7 +177,11 @@ function Header({ title, subtitle }) {
 function App() {
   const [data, setData] = useState(() => normalizeState(loadState()));
   const [login, setLogin] = useState({ identifiant: "", motDePasse: "" });
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    const savedId = localStorage.getItem(SESSION_KEY);
+    const state = normalizeState(loadState());
+    return state.users.find((u) => u.id === savedId) || null;
+  });
   const [active, setActive] = useState("dashboard");
   const [selectedUserId, setSelectedUserId] = useState("all");
   const [search, setSearch] = useState("");
@@ -185,6 +190,13 @@ function App() {
   const [userForm, setUserForm] = useState({ nom: "", identifiant: "", motDePasse: "", role: "salarie" });
   const [syncStatus, setSyncStatus] = useState(hasSupabaseConfig ? "Connexion Supabase..." : "Mode local : Supabase non configuré");
   const lastSaveRef = useRef(0);
+
+  useEffect(() => {
+    if (currentUser) {
+      setSelectedUserId(currentUser.role === "admin" ? "all" : currentUser.id);
+    }
+  }, [currentUser?.id]);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -204,6 +216,9 @@ function App() {
           const clean = normalizeState(cloud);
           setData(clean);
           saveState(clean);
+          const savedId = localStorage.getItem(SESSION_KEY);
+          const refreshedUser = clean.users.find((u) => u.id === savedId);
+          if (refreshedUser) setCurrentUser(refreshedUser);
           setSyncStatus("Synchronisé Supabase");
         } else {
           const local = normalizeState(loadState());
@@ -245,6 +260,7 @@ function App() {
     const u = data.users.find(x => x.identifiant.toLowerCase() === login.identifiant.trim().toLowerCase() && x.motDePasse === login.motDePasse);
     if (!u) return alert("Identifiant ou mot de passe incorrect.");
     setCurrentUser(u);
+    localStorage.setItem(SESSION_KEY, u.id);
     setSelectedUserId(u.role === "admin" ? "all" : u.id);
   }
   function newFiche() {
@@ -323,7 +339,10 @@ function App() {
           <button className={active==="cahiers" ? "on":""} onClick={()=>setActive("cahiers")}><Archive/>Archives / recherches</button>
           <button onClick={newFiche}><Plus/>Nouvelle demande rapide</button>
           {currentUser.role === "admin" && <button className={active==="users" ? "on":""} onClick={()=>setActive("users")}><Users/>Utilisateurs</button>}
-          <button onClick={()=>setCurrentUser(null)}><LogOut/>Déconnexion</button>
+          <button onClick={()=>{
+            localStorage.removeItem(SESSION_KEY);
+            setCurrentUser(null);
+          }}><LogOut/>Déconnexion</button>
         </nav>
       </aside>
 
