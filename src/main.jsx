@@ -474,6 +474,7 @@ function PreviewModal({fiche, close, send}){
 
 function ArchiveModal({archive, close}){
   const [tab, setTab] = React.useState("devis");
+  const [openedFiche, setOpenedFiche] = React.useState(null);
   const totalDevisJour = (archive.devis || []).reduce((s, d) => s + totalDevis(d), 0);
 
   return (
@@ -494,9 +495,9 @@ function ArchiveModal({archive, close}){
         </div>
 
         <div className="archive-tabs">
-          <button className={tab === "devis" ? "on" : ""} onClick={() => setTab("devis")}>Devis détaillés</button>
-          <button className={tab === "fiches" ? "on" : ""} onClick={() => setTab("fiches")}>Fiches cahier</button>
-          <button className={tab === "resume" ? "on" : ""} onClick={() => setTab("resume")}>Résumé salariés</button>
+          <button className={tab === "devis" ? "on" : ""} onClick={() => { setTab("devis"); setOpenedFiche(null); }}>Devis détaillés</button>
+          <button className={tab === "fiches" ? "on" : ""} onClick={() => { setTab("fiches"); setOpenedFiche(null); }}>Fiches cahier</button>
+          <button className={tab === "resume" ? "on" : ""} onClick={() => { setTab("resume"); setOpenedFiche(null); }}>Résumé salariés</button>
         </div>
 
         {tab === "devis" && (
@@ -542,7 +543,7 @@ function ArchiveModal({archive, close}){
           </div>
         )}
 
-        {tab === "fiches" && (
+        {tab === "fiches" && !openedFiche && (
           <div className="archive-list">
             {(archive.fiches || []).map((f) => (
               <div className="archive-devis-card" key={f.id}>
@@ -553,13 +554,94 @@ function ArchiveModal({archive, close}){
                   </div>
                   <strong>{money(totalFiche(f))}</strong>
                 </div>
-                <div className="mini-pieces">
-                  {(f.pieces || []).map((p) => <span key={p.id}>{p.designation}</span>)}
+
+                <table className="archive-lines-table">
+                  <thead>
+                    <tr>
+                      <th>Pièce</th>
+                      <th>Qté</th>
+                      <th>Références sélectionnées</th>
+                      <th>Total TTC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(f.pieces || []).map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.designation}</td>
+                        <td>{p.quantite || 1}</td>
+                        <td>{selectedProps(p).map((pr) => pr.reference || pr.marque || "Proposition").join(" / ")}</td>
+                        <td>{money(selectedProps(p).reduce((s, pr) => s + Number(pr.prix || 0) * Number(p.quantite || 1), 0))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="actions">
+                  <button className="primary" onClick={() => setOpenedFiche(f)}><Eye/>Ouvrir cette fiche</button>
                 </div>
               </div>
             ))}
 
             {!(archive.fiches || []).length && <div className="preview-empty">Aucune fiche dans ce dossier.</div>}
+          </div>
+        )}
+
+        {tab === "fiches" && openedFiche && (
+          <div className="archive-fiche-detail">
+            <div className="line-title">
+              <div>
+                <h3>Détail complet — {openedFiche.numero}</h3>
+                <p className="muted">Toutes les informations internes du cahier, avec références, marques, prix et images.</p>
+              </div>
+              <button onClick={() => setOpenedFiche(null)}><X/>Retour aux fiches</button>
+            </div>
+
+            <div className="archive-fiche-info-grid">
+              <div><label>Client</label><b>{openedFiche.clientNom || "Non renseigné"}</b></div>
+              <div><label>Téléphone</label><b>{openedFiche.clientTelephone || "Non renseigné"}</b></div>
+              <div><label>Plaque</label><b>{openedFiche.immatriculation || "Non renseignée"}</b></div>
+              <div><label>VIN</label><b>{openedFiche.vin || "Non renseigné"}</b></div>
+              <div><label>Véhicule</label><b>{vehicleName(openedFiche) || "Non renseigné"}</b></div>
+              <div><label>Salarié</label><b>{openedFiche.creeParNom || "Non renseigné"}</b></div>
+              <div><label>Date / heure</label><b>{openedFiche.date} {openedFiche.heureCreation || ""}</b></div>
+              <div><label>Statut</label><b>{openedFiche.statut || "Non renseigné"}</b></div>
+            </div>
+
+            <div className="archive-fiche-demand">
+              <b>Demande rapide du client</b>
+              <p>{openedFiche.demandeRapide || "Non renseignée"}</p>
+            </div>
+
+            <div className="archive-fiche-pieces">
+              {(openedFiche.pieces || []).map((p, index) => (
+                <div className="archive-fiche-piece-card" key={p.id}>
+                  <div className="archive-fiche-piece-head">
+                    <b>{index + 1}. {p.designation || "Pièce sans nom"}</b>
+                    <span>Quantité : {p.quantite || 1}</span>
+                  </div>
+
+                  <div className="archive-fiche-propositions">
+                    {(p.propositions || []).map((pr, idx) => (
+                      <div className={`archive-fiche-prop ${pr.selectionnee ? "selected" : ""}`} key={pr.id || idx}>
+                        <div className="archive-fiche-prop-head">
+                          <b>Proposition {idx + 1}</b>
+                          <span>{pr.selectionnee ? "Sélectionnée" : "Non sélectionnée"}</span>
+                        </div>
+                        <div className="archive-fiche-prop-body">
+                          <div><label>Référence</label><b>{pr.reference || "—"}</b></div>
+                          <div><label>Marque / fournisseur</label><b>{pr.marque || "—"}</b></div>
+                          <div><label>Prix TTC</label><b>{money(pr.prix)}</b></div>
+                          <div><label>Note</label><b>{pr.note || "—"}</b></div>
+                        </div>
+                        {pr.image && <img className="archive-fiche-img" src={pr.image}/>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="preview-total">Total sélectionné : {money(totalFiche(openedFiche))}</div>
           </div>
         )}
 
@@ -584,7 +666,6 @@ function ArchiveModal({archive, close}){
     </div>
   );
 }
-
 
 function DevisEditModal({devis, setDevis, save, close}){
   function updateLine(id, patch){
