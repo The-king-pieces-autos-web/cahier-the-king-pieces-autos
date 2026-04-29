@@ -170,6 +170,43 @@ async function saveStateEverywhere(data) {
   }
 }
 
+function saveSessionUser(user) {
+  if (!user) return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    id: user.id,
+    identifiant: user.identifiant,
+    nom: user.nom,
+    role: user.role,
+    motDePasse: user.motDePasse
+  }));
+}
+
+function loadSessionUser(users = []) {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+
+    let saved;
+    try {
+      saved = JSON.parse(raw);
+    } catch {
+      saved = { id: raw };
+    }
+
+    return (
+      users.find((u) => u.id === saved.id) ||
+      users.find((u) => u.identifiant === saved.identifiant) ||
+      (saved.id ? saved : null)
+    );
+  } catch {
+    return null;
+  }
+}
+
+function clearSessionUser() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
 function Header({ title, subtitle }) {
   return <div className="header"><h1>{title}</h1><p>{subtitle}</p></div>;
 }
@@ -178,9 +215,8 @@ function App() {
   const [data, setData] = useState(() => normalizeState(loadState()));
   const [login, setLogin] = useState({ identifiant: "", motDePasse: "" });
   const [currentUser, setCurrentUser] = useState(() => {
-    const savedId = localStorage.getItem(SESSION_KEY);
     const state = normalizeState(loadState());
-    return state.users.find((u) => u.id === savedId) || null;
+    return loadSessionUser(state.users);
   });
   const [active, setActive] = useState("dashboard");
   const [selectedUserId, setSelectedUserId] = useState("all");
@@ -216,9 +252,11 @@ function App() {
           const clean = normalizeState(cloud);
           setData(clean);
           saveState(clean);
-          const savedId = localStorage.getItem(SESSION_KEY);
-          const refreshedUser = clean.users.find((u) => u.id === savedId);
-          if (refreshedUser) setCurrentUser(refreshedUser);
+          const refreshedUser = loadSessionUser(clean.users);
+          if (refreshedUser) {
+            setCurrentUser(refreshedUser);
+            saveSessionUser(refreshedUser);
+          }
           setSyncStatus("Synchronisé Supabase");
         } else {
           const local = normalizeState(loadState());
@@ -239,6 +277,8 @@ function App() {
       const clean = normalizeState(next);
       setData(clean);
       saveState(clean);
+      const refreshedUser = loadSessionUser(clean.users);
+      if (refreshedUser) setCurrentUser(refreshedUser);
       setSyncStatus("Mise à jour reçue d’un autre poste");
     });
 
@@ -260,7 +300,7 @@ function App() {
     const u = data.users.find(x => x.identifiant.toLowerCase() === login.identifiant.trim().toLowerCase() && x.motDePasse === login.motDePasse);
     if (!u) return alert("Identifiant ou mot de passe incorrect.");
     setCurrentUser(u);
-    localStorage.setItem(SESSION_KEY, u.id);
+    saveSessionUser(u);
     setSelectedUserId(u.role === "admin" ? "all" : u.id);
   }
   function newFiche() {
@@ -339,10 +379,7 @@ function App() {
           <button className={active==="cahiers" ? "on":""} onClick={()=>setActive("cahiers")}><Archive/>Archives / recherches</button>
           <button onClick={newFiche}><Plus/>Nouvelle demande rapide</button>
           {currentUser.role === "admin" && <button className={active==="users" ? "on":""} onClick={()=>setActive("users")}><Users/>Utilisateurs</button>}
-          <button onClick={()=>{
-            localStorage.removeItem(SESSION_KEY);
-            setCurrentUser(null);
-          }}><LogOut/>Déconnexion</button>
+          <button onClick={()=>{ clearSessionUser(); setCurrentUser(null); }}><LogOut/>Déconnexion</button>
         </nav>
       </aside>
 
@@ -473,10 +510,30 @@ function App() {
                 <input placeholder="Mot de passe" value={userForm.motDePasse} onChange={e=>setUserForm({...userForm, motDePasse:e.target.value})}/>
                 <select value={userForm.role} onChange={e=>setUserForm({...userForm, role:e.target.value})}><option value="salarie">Salarié</option><option value="admin">Admin</option></select>
                 <button className="primary" onClick={()=>{if(!userForm.nom||!userForm.identifiant||!userForm.motDePasse)return alert("Remplis tout."); commit({...data, users:[...data.users,{...userForm,id:uid()}]}); setUserForm({nom:"",identifiant:"",motDePasse:"",role:"salarie"});}}><Plus/>Ajouter</button>
+                <button className="danger" onClick={()=>{
+                  if(confirm("Supprimer tous les anciens utilisateurs et garder uniquement le compte connecté ?")) {
+                    const keep = currentUser || data.users.find(u=>u.role==="admin") || initialUsers[0];
+                    const cleanKeep = {...keep, role:"admin"};
+                    commit({...data, users:[cleanKeep]});
+                    setCurrentUser(cleanKeep);
+                    saveSessionUser(cleanKeep);
+                  }
+                }}><Trash2/>Supprimer anciens utilisateurs</button>
               </div>
               <div className="panel">
                 <h3>Liste</h3>
-                {data.users.map(u => <div className="user-row" key={u.id}><div><b>{u.nom}</b><small>{u.identifiant} · {u.role} · mot de passe : {u.motDePasse}</small></div></div>)}
+                {data.users.map(u => (
+                  <div className="user-row" key={u.id}>
+                    <div><b>{u.nom}</b><small>{u.identifiant} · {u.role} · mot de passe : {u.motDePasse}</small></div>
+                    {u.id !== currentUser.id && (
+                      <button className="danger" onClick={()=>{
+                        if(confirm("Supprimer cet utilisateur ?")) {
+                          commit({...data, users:data.users.filter(x=>x.id!==u.id)});
+                        }
+                      }}><Trash2/>Supprimer</button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </section>
