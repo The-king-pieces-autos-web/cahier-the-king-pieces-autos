@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BookOpen, Search, Plus, Printer, Trash2, Edit3, Save, X, Phone,
@@ -9,6 +9,7 @@ import {
 import "./styles.css";
 import logo from "./assets/logo.png";
 import hero from "./assets/dashboard-hero.jpeg";
+import { hasSupabaseConfig, loadCloudState, saveCloudState, subscribeCloudState, supabase } from "./lib/supabase";
 
 const ENTREPRISE = {
   nom: "THE KING PIÈCES AUTOS",
@@ -144,12 +145,36 @@ function loadState() {
 }
 function saveState(data) { localStorage.setItem(LS_KEY, JSON.stringify(data)); }
 
+function normalizeState(raw) {
+  const fallback = { users: initialUsers, fiches: [] };
+  if (!raw || typeof raw !== "object") return fallback;
+
+  return {
+    users: Array.isArray(raw.users) && raw.users.length ? raw.users : initialUsers,
+    fiches: Array.isArray(raw.fiches) ? raw.fiches : [],
+  };
+}
+
+async function saveStateEverywhere(data) {
+  const clean = normalizeState(data);
+  saveState(clean);
+
+  if (hasSupabaseConfig) {
+    try {
+      await saveCloudState(clean);
+    } catch (err) {
+      console.error("Erreur sauvegarde Supabase", err);
+      alert("Attention : sauvegarde Supabase impossible. Vérifie la connexion ou les variables Render.");
+    }
+  }
+}
+
 function Header({ title, subtitle }) {
   return <div className="header"><h1>{title}</h1><p>{subtitle}</p></div>;
 }
 
 function App() {
-  const [data, setData] = useState(loadState);
+  const [data, setData] = useState(() => normalizeState(loadState()));
   const [login, setLogin] = useState({ identifiant: "", motDePasse: "" });
   const [currentUser, setCurrentUser] = useState(null);
   const [active, setActive] = useState("dashboard");
@@ -158,8 +183,63 @@ function App() {
   const [editing, setEditing] = useState(null);
   const [openPieceId, setOpenPieceId] = useState("");
   const [userForm, setUserForm] = useState({ nom: "", identifiant: "", motDePasse: "", role: "salarie" });
+  const [syncStatus, setSyncStatus] = useState(hasSupabaseConfig ? "Connexion Supabase..." : "Mode local : Supabase non configuré");
+  const lastSaveRef = useRef(0);
 
-  function commit(next) { setData(next); saveState(next); }
+  useEffect(() => {
+    let cancelled = false;
+
+    async function startCloudSync() {
+      if (!hasSupabaseConfig) {
+        setSyncStatus("Mode local : ajoute Supabase pour synchroniser les PC");
+        return;
+      }
+
+      try {
+        const cloud = await loadCloudState();
+
+        if (cancelled) return;
+
+        if (cloud) {
+          const clean = normalizeState(cloud);
+          setData(clean);
+          saveState(clean);
+          setSyncStatus("Synchronisé Supabase");
+        } else {
+          const local = normalizeState(loadState());
+          await saveCloudState(local);
+          setSyncStatus("Supabase initialisé");
+        }
+      } catch (err) {
+        console.error("Erreur chargement Supabase", err);
+        if (!cancelled) setSyncStatus("Erreur Supabase : vérifie URL / clé / table");
+      }
+    }
+
+    startCloudSync();
+
+    const channel = subscribeCloudState((next) => {
+      if (Date.now() - lastSaveRef.current < 800) return;
+
+      const clean = normalizeState(next);
+      setData(clean);
+      saveState(clean);
+      setSyncStatus("Mise à jour reçue d’un autre poste");
+    });
+
+    return () => {
+      cancelled = true;
+      if (channel && supabase) supabase.removeChannel(channel);
+    };
+  }, []);
+
+  function commit(next) {
+    const clean = normalizeState(next);
+    lastSaveRef.current = Date.now();
+    setData(clean);
+    saveStateEverywhere(clean);
+    setSyncStatus(hasSupabaseConfig ? "Sauvegardé et synchronisé" : "Sauvegardé en local");
+  }
   function connect(e) {
     e.preventDefault();
     const u = data.users.find(x => x.identifiant.toLowerCase() === login.identifiant.trim().toLowerCase() && x.motDePasse === login.motDePasse);
@@ -236,6 +316,7 @@ function App() {
           <img src={logo} />
           <b>{ENTREPRISE.nom}</b>
           <small>{currentUser.nom} · {currentUser.role === "admin" ? "Administrateur" : "Salarié"}</small>
+          <small className="sync-status">{syncStatus}</small>
         </div>
         <nav>
           <button className={active==="dashboard" ? "on":""} onClick={()=>setActive("dashboard")}><BookOpen/>Tableau de bord</button>

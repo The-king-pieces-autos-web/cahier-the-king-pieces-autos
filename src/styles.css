@@ -50,3 +50,5 @@ main{padding:28px}.hero{min-height:280px;background-size:cover;background-positi
 .two-proposals {
   grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
 }
+
+.sync-status{display:inline-block;margin-top:6px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,.1);color:#dbeafe;font-size:11px}
