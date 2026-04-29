@@ -140,6 +140,15 @@ function vehicleName(f) {
     f.finition
   ].filter(Boolean).join(" ");
 }
+
+function normalizePlate(value = "") {
+  return String(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function isPlateSearch(searchValue = "") {
+  return normalizePlate(searchValue).length >= 5;
+}
+
 function loadState() {
   try { const x = localStorage.getItem(LS_KEY); if (x) return JSON.parse(x); } catch {}
   return { users: initialUsers, fiches: [] };
@@ -326,13 +335,34 @@ function App() {
 
   const visibleFiches = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const plateQuery = normalizePlate(search);
+    const plateMode = currentUser?.role !== "admin" && isPlateSearch(search);
+
     return data.fiches
-      .filter(f => currentUser?.role === "admin" || f.creeParId === currentUser?.id || selectedUserId === f.creeParId)
-      .filter(f => selectedUserId === "all" || f.creeParId === selectedUserId)
+      .filter((f) => {
+        if (currentUser?.role === "admin") {
+          return selectedUserId === "all" || f.creeParId === selectedUserId;
+        }
+
+        // Salarié : voir uniquement son cahier.
+        if (f.creeParId === currentUser?.id) return true;
+
+        // Exception : si le salarié cherche une plaque, il peut voir uniquement les fiches qui ont cette plaque.
+        if (plateMode && normalizePlate(f.immatriculation).includes(plateQuery)) return true;
+
+        return false;
+      })
       .filter(f => {
         if (!q) return true;
+
+        // Pour un salarié, la recherche dans les fiches des autres ne marche que par plaque.
+        if (currentUser?.role !== "admin" && f.creeParId !== currentUser?.id) {
+          return normalizePlate(f.immatriculation).includes(plateQuery);
+        }
+
         const text = [
-          f.numero, f.clientNom, f.clientTelephone, f.immatriculation, f.vin, f.marque, f.modele, f.marqueManuelle, f.modeleManuel, f.creeParNom,
+          f.numero, f.clientNom, f.clientTelephone, f.immatriculation, f.vin,
+          f.marque, f.modele, f.marqueManuelle, f.modeleManuel, f.creeParNom,
           f.demandeRapide,
           ...(f.pieces || []).flatMap(p => [p.designation, ...((p.propositions || []).flatMap(pr => [pr.reference, pr.marque, pr.prix]))])
         ].join(" ").toLowerCase();
@@ -401,35 +431,70 @@ function App() {
               <div><Shield/><b>{data.fiches.filter(f=>isSameDay(f.date)).length}</b><span>Fiches du jour</span></div>
             </div>
 
-            <div className="dashboard-grid">
-              <div className="panel">
-                <h3>Nombre de fiches par cahier salarié</h3>
-                <div className="employee-table">
-                  <div className="employee-head"><span>Cahier</span><span>Total</span><span>Aujourd’hui</span><span>Validées</span><span>Montant</span></div>
-                  {statsByUser.map(s => (
-                    <div className="employee-row" key={s.user.id}>
-                      <b>{s.user.nom}</b><span>{s.total}</span><span>{s.today}</span><span>{s.validated}</span><span>{money(s.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel">
-                <h3>Demandes à reprendre</h3>
-                <div className="today-list">
-                  {data.fiches
-                    .filter(f => f.statut !== "termine")
-                    .filter(f => currentUser.role === "admin" || f.creeParId === currentUser.id)
-                    .slice(0, 10)
-                    .map(f => (
-                      <button key={f.id} onClick={()=>{setEditing(f); setOpenPieceId(f.pieces?.[0]?.id || ""); setActive("edition");}}>
-                        <span><b>{f.immatriculation || f.clientTelephone || "Demande sans plaque"}</b><small>{f.creeParNom} · {f.date} {f.heureCreation || ""} · {splitPieces(f.demandeRapide).slice(0,3).join(", ")}</small></span>
-                        <strong>{f.pieces?.length || splitPieces(f.demandeRapide).length} pièce(s)</strong>
-                      </button>
+            {currentUser.role === "admin" ? (
+              <div className="dashboard-grid">
+                <div className="panel">
+                  <h3>Nombre de fiches par cahier salarié</h3>
+                  <div className="employee-table">
+                    <div className="employee-head"><span>Cahier</span><span>Total</span><span>Aujourd’hui</span><span>Validées</span><span>Montant</span></div>
+                    {statsByUser.map(s => (
+                      <div className="employee-row" key={s.user.id}>
+                        <b>{s.user.nom}</b><span>{s.total}</span><span>{s.today}</span><span>{s.validated}</span><span>{money(s.amount)}</span>
+                      </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="panel">
+                  <h3>Demandes à reprendre — tous les salariés</h3>
+                  <div className="today-list">
+                    {data.fiches
+                      .filter(f => f.statut !== "termine")
+                      .slice(0, 10)
+                      .map(f => (
+                        <button key={f.id} onClick={()=>{setEditing(f); setOpenPieceId(f.pieces?.[0]?.id || ""); setActive("edition");}}>
+                          <span><b>{f.immatriculation || f.clientTelephone || "Demande sans plaque"}</b><small>{f.creeParNom} · {f.date} {f.heureCreation || ""} · {splitPieces(f.demandeRapide).slice(0,3).join(", ")}</small></span>
+                          <strong>{f.pieces?.length || splitPieces(f.demandeRapide).length} pièce(s)</strong>
+                        </button>
+                      ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="dashboard-grid employee-only">
+                <div className="panel">
+                  <h3>Mes statistiques</h3>
+                  {(() => {
+                    const docs = data.fiches.filter(f => f.creeParId === currentUser.id);
+                    const day = docs.filter(f => isSameDay(f.date));
+                    return (
+                      <div className="employee-personal-stats">
+                        <div><b>{docs.length}</b><span>Mes fiches au total</span></div>
+                        <div><b>{day.length}</b><span>Mes fiches aujourd’hui</span></div>
+                        <div><b>{day.filter(f => f.archiveValidee).length}</b><span>Mes fiches validées aujourd’hui</span></div>
+                        <div><b>{money(day.reduce((s,f)=>s+totalFiche(f),0))}</b><span>Mon total du jour</span></div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="panel">
+                  <h3>Mes demandes à reprendre</h3>
+                  <div className="today-list">
+                    {data.fiches
+                      .filter(f => f.creeParId === currentUser.id)
+                      .filter(f => f.statut !== "termine")
+                      .slice(0, 10)
+                      .map(f => (
+                        <button key={f.id} onClick={()=>{setEditing(f); setOpenPieceId(f.pieces?.[0]?.id || ""); setActive("edition");}}>
+                          <span><b>{f.immatriculation || f.clientTelephone || "Demande sans plaque"}</b><small>{f.date} {f.heureCreation || ""} · {splitPieces(f.demandeRapide).slice(0,3).join(", ")}</small></span>
+                          <strong>{f.pieces?.length || splitPieces(f.demandeRapide).length} pièce(s)</strong>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {currentUser.role === "admin" && (
               <div className="panel admin-monitor">
@@ -457,13 +522,17 @@ function App() {
 
         {active === "cahiers" && (
           <section>
-            <Header title="Archives et recherches" subtitle="Recherche par plaque, VIN, téléphone, client, référence ou salarié." />
+            <Header title="Archives et recherches" subtitle={currentUser.role === "admin" ? "Admin : tous les cahiers. Recherche par plaque, VIN, téléphone, client, référence ou salarié." : "Salarié : ton cahier uniquement. Exception : tu peux retrouver une fiche d’un autre salarié en cherchant la plaque."} />
             <div className="toolbar">
               <div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher par plaque d’immatriculation..." /></div>
-              <select value={selectedUserId} onChange={e=>setSelectedUserId(e.target.value)}>
-                <option value="all">Tous les cahiers</option>
-                {data.users.map(u => <option key={u.id} value={u.id}>Cahier de {u.nom}</option>)}
-              </select>
+              {currentUser.role === "admin" ? (
+                <select value={selectedUserId} onChange={e=>setSelectedUserId(e.target.value)}>
+                  <option value="all">Tous les cahiers</option>
+                  {data.users.map(u => <option key={u.id} value={u.id}>Cahier de {u.nom}</option>)}
+                </select>
+              ) : (
+                <div className="locked-filter">Mon cahier uniquement</div>
+              )}
               <button className="primary" onClick={newFiche}><Plus/>Nouvelle</button>
             </div>
 
@@ -477,6 +546,9 @@ function App() {
                   <div className="mini-pieces">
                     {((f.pieces || []).length ? f.pieces : splitPieces(f.demandeRapide).map(x => ({id:x, designation:x}))).slice(0,5).map(p => <span key={p.id}>{p.designation}</span>)}
                   </div>
+                  {currentUser.role !== "admin" && f.creeParId !== currentUser.id && (
+                    <div className="external-warning">Fiche déjà faite par {f.creeParNom}. Consultation par recherche plaque uniquement.</div>
+                  )}
                   <div className="actions">
                     <button onClick={()=>printFiche(f)}><Printer/>Fiche archive</button>
                     {canEdit(f) && <button onClick={()=>{setEditing(f); setOpenPieceId(f.pieces?.[0]?.id || ""); setActive("edition");}}><Edit3/>Ouvrir</button>}

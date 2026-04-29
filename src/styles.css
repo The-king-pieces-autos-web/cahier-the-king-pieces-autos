@@ -52,3 +52,51 @@ main{padding:28px}.hero{min-height:280px;background-size:cover;background-positi
 }
 
 .sync-status{display:inline-block;margin-top:6px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,.1);color:#dbeafe;font-size:11px}
+
+.locked-filter {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fbff;
+  color: var(--blue);
+  font-weight: 900;
+  text-align: center;
+}
+.employee-only {
+  grid-template-columns: 1fr 1fr;
+}
+.employee-personal-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.employee-personal-stats div {
+  background: #f8fbff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  gap: 6px;
+}
+.employee-personal-stats b {
+  color: var(--blue);
+  font-size: 26px;
+}
+.employee-personal-stats span {
+  color: var(--muted);
+  font-weight: 800;
+}
+.external-warning {
+  background: #fff8df;
+  border: 1px solid #ead391;
+  color: #5a4300;
+  border-radius: 12px;
+  padding: 9px;
+  margin: 10px 0;
+  font-weight: 800;
+  font-size: 12px;
+}
+@media(max-width:900px){
+  .employee-only,
+  .employee-personal-stats { grid-template-columns: 1fr; }
+}
