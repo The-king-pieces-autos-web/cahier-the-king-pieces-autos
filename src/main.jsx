@@ -172,6 +172,7 @@ function App(){
   const [login, setLogin] = useState({ identifiant:"", motDePasse:"" });
   const [active, setActive] = useState("dashboard");
   const [search, setSearch] = useState("");
+  const [showAllFiches, setShowAllFiches] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("all");
   const [editing, setEditing] = useState(null);
   const [openPieceId, setOpenPieceId] = useState("");
@@ -280,7 +281,7 @@ function App(){
     const q=search.trim().toLowerCase(), plateQ=normalizePlate(search), plateMode=currentUser?.role!=="admin" && isPlateSearch(search);
     return data.fiches
       .filter(f=>{
-        const todayMode = !q;
+        const todayMode = !q && !showAllFiches;
         if(todayMode && f.date !== today()) return false;
         if(currentUser?.role==="admin") return selectedUserId==="all" || f.creeParId===selectedUserId;
         if(f.creeParId===currentUser?.id) return true;
@@ -292,7 +293,7 @@ function App(){
         const txt=[f.numero,f.clientNom,f.clientTelephone,f.immatriculation,f.vin,vehicleName(f),f.creeParNom,f.demandeRapide,...(f.pieces||[]).flatMap(p=>[p.designation,...(p.propositions||[]).flatMap(pr=>[pr.reference,pr.marque,pr.prix])])].join(" ").toLowerCase();
         return txt.includes(q);
       });
-  },[data.fiches,search,selectedUserId,currentUser]);
+  },[data.fiches,search,selectedUserId,currentUser,showAllFiches]);
 
   const visibleDevis = useMemo(()=>{
     const q=search.trim().toLowerCase();
@@ -327,7 +328,7 @@ function App(){
         {currentUser.role==="admin"?<><div className="stats"><div><Clock/><b>{data.fiches.filter(f=>f.statut==="en_attente"&&isSameDay(f.date)).length}</b><span>En attente</span></div><div><Edit3/><b>{data.fiches.filter(f=>f.statut==="en_cours"&&isSameDay(f.date)).length}</b><span>En cours</span></div><div><CheckCircle2/><b>{data.fiches.filter(f=>f.statut==="realise"&&isSameDay(f.date)).length}</b><span>Réalisés</span></div><div><Euro/><b>{money(data.devis.filter(d=>isSameDay(d.date)).reduce((s,d)=>s+totalDevis(d),0))}</b><span>Total devis du jour</span></div></div><div className="panel"><h3>Suivi efficacité par salarié aujourd’hui</h3><div className="employee-table"><div className="employee-head"><span>Salarié</span><span>Fiches</span><span>Réalisés</span><span>Devis</span><span>Total</span></div>{statsByUser.map(s=><div className="employee-row" key={s.user.id}><b>{s.user.nom}</b><span>{s.fiches}</span><span>{s.realise}</span><span>{s.devis}</span><span>{money(s.total)}</span></div>)}</div></div></>:<div className="dashboard-grid"><div className="panel"><h3>Mes statistiques aujourd’hui</h3>{(()=>{const f=data.fiches.filter(x=>x.creeParId===currentUser.id&&isSameDay(x.date));const d=data.devis.filter(x=>x.creeParId===currentUser.id&&isSameDay(x.date));return <div className="employee-personal-stats"><div><b>{f.length}</b><span>Mes fiches</span></div><div><b>{f.filter(x=>x.statut==="realise").length}</b><span>Réalisés</span></div><div><b>{d.length}</b><span>Mes devis</span></div><div><b>{money(d.reduce((s,x)=>s+totalDevis(x),0))}</b><span>Total</span></div></div>})()}</div><div className="panel"><h3>Mes demandes à reprendre</h3><ListResume items={data.fiches.filter(f=>f.creeParId===currentUser.id&&f.statut!=="realise"&&isSameDay(f.date)).slice(0,8)} open={(f)=>{setEditing(f);setOpenPieceId(f.pieces?.[0]?.id||"");setActive("edition")}}/></div></div>}
       </section>}
 
-      {active==="cahier"&&<section><Header title="Cahier Pro" subtitle={currentUser.role==="admin"?"Admin : tous les cahiers. Recherche ancienne par plaque, VIN, nom, téléphone ou référence.":"Salarié : ton cahier uniquement. Exception : retrouver une fiche par plaque."}/><div className="toolbar"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom, téléphone..."/></div>{currentUser.role==="admin"?<select value={selectedUserId} onChange={e=>setSelectedUserId(e.target.value)}><option value="all">Tous les cahiers</option>{data.users.map(u=><option key={u.id} value={u.id}>Cahier de {u.nom}</option>)}</select>:<div className="locked-filter">Mon cahier</div>}<button className="primary" onClick={newFiche}><Plus/>Nouvelle</button></div><div className="cards">{visibleFiches.map(f=><FicheCard key={f.id} f={f} currentUser={currentUser} canEdit={canEdit(f)} canDelete={canDelete()} open={()=>{setEditing(f);setOpenPieceId(f.pieces?.[0]?.id||"");setActive("edition")}} preview={()=>setPreview(f)} del={()=>{if(confirm("Supprimer ?"))commit({...data,fiches:data.fiches.filter(x=>x.id!==f.id)})}} />)}</div></section>}
+      {active==="cahier"&&<section><Header title="Cahier Pro" subtitle={currentUser.role==="admin"?"Admin : tous les cahiers. Recherche ancienne par plaque, VIN, nom, téléphone ou référence.":"Salarié : ton cahier uniquement. Exception : retrouver une fiche par plaque."}/><div className="toolbar"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom, téléphone..."/></div>{currentUser.role==="admin"?<select value={selectedUserId} onChange={e=>setSelectedUserId(e.target.value)}><option value="all">Tous les cahiers</option>{data.users.map(u=><option key={u.id} value={u.id}>Cahier de {u.nom}</option>)}</select>:<div className="locked-filter">Mon cahier</div>}<button className="primary" onClick={newFiche}><Plus/>Nouvelle</button><button className={showAllFiches ? "active-soft" : ""} onClick={()=>setShowAllFiches(!showAllFiches)}><Archive/>{showAllFiches ? "Afficher jour actuel" : "Afficher toutes les anciennes fiches"}</button></div>{showAllFiches && <div className="info-banner">Mode historique activé : toutes les fiches anciennes sont affichées. Tu peux aussi rechercher par plaque, VIN ou nom.</div>}<div className="cards">{visibleFiches.map(f=><FicheCard key={f.id} f={f} currentUser={currentUser} canEdit={canEdit(f)} canDelete={canDelete()} open={()=>{setEditing(f);setOpenPieceId(f.pieces?.[0]?.id||"");setActive("edition")}} preview={()=>setPreview(f)} del={()=>{if(confirm("Supprimer ?"))commit({...data,fiches:data.fiches.filter(x=>x.id!==f.id)})}} />)}</div></section>}
 
       {active==="edition"&&editing&&<Editor editing={editing} setEditing={setEditing} openPieceId={openPieceId} setOpenPieceId={setOpenPieceId} saveFiche={saveFiche} sendToDevis={sendToDevis} setPreview={setPreview} cancel={()=>setActive("cahier")}/>}
 
@@ -474,7 +475,6 @@ function PreviewModal({fiche, close, send}){
 
 function ArchiveModal({archive, close}){
   const [tab, setTab] = React.useState("devis");
-  const [openedFiche, setOpenedFiche] = React.useState(null);
   const totalDevisJour = (archive.devis || []).reduce((s, d) => s + totalDevis(d), 0);
 
   return (
@@ -495,9 +495,9 @@ function ArchiveModal({archive, close}){
         </div>
 
         <div className="archive-tabs">
-          <button className={tab === "devis" ? "on" : ""} onClick={() => { setTab("devis"); setOpenedFiche(null); }}>Devis détaillés</button>
-          <button className={tab === "fiches" ? "on" : ""} onClick={() => { setTab("fiches"); setOpenedFiche(null); }}>Fiches cahier</button>
-          <button className={tab === "resume" ? "on" : ""} onClick={() => { setTab("resume"); setOpenedFiche(null); }}>Résumé salariés</button>
+          <button className={tab === "devis" ? "on" : ""} onClick={() => setTab("devis")}>Devis détaillés</button>
+          <button className={tab === "fiches" ? "on" : ""} onClick={() => setTab("fiches")}>Fiches cahier</button>
+          <button className={tab === "resume" ? "on" : ""} onClick={() => setTab("resume")}>Résumé salariés</button>
         </div>
 
         {tab === "devis" && (
@@ -543,7 +543,7 @@ function ArchiveModal({archive, close}){
           </div>
         )}
 
-        {tab === "fiches" && !openedFiche && (
+        {tab === "fiches" && (
           <div className="archive-list">
             {(archive.fiches || []).map((f) => (
               <div className="archive-devis-card" key={f.id}>
@@ -554,94 +554,13 @@ function ArchiveModal({archive, close}){
                   </div>
                   <strong>{money(totalFiche(f))}</strong>
                 </div>
-
-                <table className="archive-lines-table">
-                  <thead>
-                    <tr>
-                      <th>Pièce</th>
-                      <th>Qté</th>
-                      <th>Références sélectionnées</th>
-                      <th>Total TTC</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(f.pieces || []).map((p) => (
-                      <tr key={p.id}>
-                        <td>{p.designation}</td>
-                        <td>{p.quantite || 1}</td>
-                        <td>{selectedProps(p).map((pr) => pr.reference || pr.marque || "Proposition").join(" / ")}</td>
-                        <td>{money(selectedProps(p).reduce((s, pr) => s + Number(pr.prix || 0) * Number(p.quantite || 1), 0))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div className="actions">
-                  <button className="primary" onClick={() => setOpenedFiche(f)}><Eye/>Ouvrir cette fiche</button>
+                <div className="mini-pieces">
+                  {(f.pieces || []).map((p) => <span key={p.id}>{p.designation}</span>)}
                 </div>
               </div>
             ))}
 
             {!(archive.fiches || []).length && <div className="preview-empty">Aucune fiche dans ce dossier.</div>}
-          </div>
-        )}
-
-        {tab === "fiches" && openedFiche && (
-          <div className="archive-fiche-detail">
-            <div className="line-title">
-              <div>
-                <h3>Détail complet — {openedFiche.numero}</h3>
-                <p className="muted">Toutes les informations internes du cahier, avec références, marques, prix et images.</p>
-              </div>
-              <button onClick={() => setOpenedFiche(null)}><X/>Retour aux fiches</button>
-            </div>
-
-            <div className="archive-fiche-info-grid">
-              <div><label>Client</label><b>{openedFiche.clientNom || "Non renseigné"}</b></div>
-              <div><label>Téléphone</label><b>{openedFiche.clientTelephone || "Non renseigné"}</b></div>
-              <div><label>Plaque</label><b>{openedFiche.immatriculation || "Non renseignée"}</b></div>
-              <div><label>VIN</label><b>{openedFiche.vin || "Non renseigné"}</b></div>
-              <div><label>Véhicule</label><b>{vehicleName(openedFiche) || "Non renseigné"}</b></div>
-              <div><label>Salarié</label><b>{openedFiche.creeParNom || "Non renseigné"}</b></div>
-              <div><label>Date / heure</label><b>{openedFiche.date} {openedFiche.heureCreation || ""}</b></div>
-              <div><label>Statut</label><b>{openedFiche.statut || "Non renseigné"}</b></div>
-            </div>
-
-            <div className="archive-fiche-demand">
-              <b>Demande rapide du client</b>
-              <p>{openedFiche.demandeRapide || "Non renseignée"}</p>
-            </div>
-
-            <div className="archive-fiche-pieces">
-              {(openedFiche.pieces || []).map((p, index) => (
-                <div className="archive-fiche-piece-card" key={p.id}>
-                  <div className="archive-fiche-piece-head">
-                    <b>{index + 1}. {p.designation || "Pièce sans nom"}</b>
-                    <span>Quantité : {p.quantite || 1}</span>
-                  </div>
-
-                  <div className="archive-fiche-propositions">
-                    {(p.propositions || []).map((pr, idx) => (
-                      <div className={`archive-fiche-prop ${pr.selectionnee ? "selected" : ""}`} key={pr.id || idx}>
-                        <div className="archive-fiche-prop-head">
-                          <b>Proposition {idx + 1}</b>
-                          <span>{pr.selectionnee ? "Sélectionnée" : "Non sélectionnée"}</span>
-                        </div>
-                        <div className="archive-fiche-prop-body">
-                          <div><label>Référence</label><b>{pr.reference || "—"}</b></div>
-                          <div><label>Marque / fournisseur</label><b>{pr.marque || "—"}</b></div>
-                          <div><label>Prix TTC</label><b>{money(pr.prix)}</b></div>
-                          <div><label>Note</label><b>{pr.note || "—"}</b></div>
-                        </div>
-                        {pr.image && <img className="archive-fiche-img" src={pr.image}/>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="preview-total">Total sélectionné : {money(totalFiche(openedFiche))}</div>
           </div>
         )}
 
@@ -666,6 +585,7 @@ function ArchiveModal({archive, close}){
     </div>
   );
 }
+
 
 function DevisEditModal({devis, setDevis, save, close}){
   function updateLine(id, patch){

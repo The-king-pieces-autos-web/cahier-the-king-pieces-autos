@@ -351,27 +351,17 @@ nav{display:grid;gap:10px}nav button{justify-content:flex-start;background:rgba(
   }
 }
 
-.archive-fiche-detail{display:grid;gap:14px}
-.archive-fiche-info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.archive-fiche-info-grid div{background:#f8fbff;border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:5px}
-.archive-fiche-info-grid label{color:var(--muted);font-size:11px;text-transform:uppercase}
-.archive-fiche-info-grid b{color:var(--blue)}
-.archive-fiche-demand{background:#fff8df;border:1px solid #ead391;border-radius:14px;padding:12px}
-.archive-fiche-demand b{color:var(--blue)}
-.archive-fiche-demand p{margin:7px 0 0;white-space:pre-wrap}
-.archive-fiche-pieces{display:grid;gap:14px}
-.archive-fiche-piece-card{border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff}
-.archive-fiche-piece-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px;color:var(--blue)}
-.archive-fiche-piece-head span{background:#eef3ff;border-radius:999px;padding:6px 10px;font-weight:900}
-.archive-fiche-propositions{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-.archive-fiche-prop{border:1px solid var(--line);border-radius:16px;padding:12px;background:#f8fbff}
-.archive-fiche-prop.selected{border:2px solid var(--gold);background:#fffaf0}
-.archive-fiche-prop-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px}
-.archive-fiche-prop-head b{color:var(--blue)}
-.archive-fiche-prop-head span{color:#166534;font-weight:900}
-.archive-fiche-prop-body{display:grid;gap:8px}
-.archive-fiche-prop-body div{display:grid;gap:3px}
-.archive-fiche-prop-body label{color:var(--muted);font-size:11px;text-transform:uppercase}
-.archive-fiche-prop-body b{color:#111827}
-.archive-fiche-img{width:130px;height:95px;object-fit:cover;border-radius:12px;border:1px solid var(--line);margin-top:10px}
-@media(max-width:900px){.archive-fiche-info-grid{grid-template-columns:1fr}.archive-fiche-piece-head{display:grid}}
+.info-banner{
+  background:#fff8df;
+  border:1px solid #ead391;
+  color:#5a4300;
+  border-radius:14px;
+  padding:12px 14px;
+  margin:0 0 16px;
+  font-weight:800;
+}
+.active-soft{
+  background:#fff8df !important;
+  color:#5a4300 !important;
+  border:1px solid #ead391 !important;
+}
