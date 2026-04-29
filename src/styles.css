@@ -322,3 +322,31 @@ nav{display:grid;gap:10px}nav button{justify-content:flex-start;background:rgba(
     text-align:left;
   }
 }
+
+.devis-edit-title{
+  margin-top:18px;
+}
+.devis-edit-lines{
+  display:grid;
+  gap:10px;
+  margin-top:12px;
+}
+.devis-edit-row{
+  display:grid;
+  grid-template-columns:1.6fr .45fr .65fr .65fr auto;
+  gap:8px;
+  align-items:center;
+  background:#f8fbff;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:10px;
+}
+.devis-edit-row b{
+  color:var(--blue);
+  text-align:right;
+}
+@media(max-width:900px){
+  .devis-edit-row{
+    grid-template-columns:1fr;
+  }
+}

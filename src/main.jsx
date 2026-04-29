@@ -177,6 +177,7 @@ function App(){
   const [openPieceId, setOpenPieceId] = useState("");
   const [preview, setPreview] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(null);
+  const [editingDevis, setEditingDevis] = useState(null);
   const [userForm, setUserForm] = useState({ nom:"", identifiant:"", motDePasse:"", role:"salarie" });
   const [syncStatus, setSyncStatus] = useState(hasSupabaseConfig ? "Connexion Supabase..." : "Mode local");
   const lastSaveRef = useRef(0);
@@ -259,6 +260,19 @@ function App(){
     commit({...data,fiches,devis:[dev,...data.devis]});
     setEditing(f); setActive("devis"); alert("Envoyé dans la partie Devis.");
   }
+
+  function saveDevisClient(dev){
+    if(!dev) return;
+    const devis = data.devis.map((d) => d.id === dev.id ? dev : d);
+    commit({...data, devis});
+    setEditingDevis(null);
+    alert("Devis modifié.");
+  }
+
+  function deleteDevisClient(devId){
+    if(!confirm("Supprimer ce devis ?")) return;
+    commit({...data, devis:data.devis.filter((d)=>d.id!==devId)});
+  }
   function canEdit(f){ return currentUser?.role==="admin" || f.creeParId===currentUser?.id; }
   function canDelete(){ return currentUser?.role==="admin"; }
 
@@ -317,7 +331,9 @@ function App(){
 
       {active==="edition"&&editing&&<Editor editing={editing} setEditing={setEditing} openPieceId={openPieceId} setOpenPieceId={setOpenPieceId} saveFiche={saveFiche} sendToDevis={sendToDevis} setPreview={setPreview} cancel={()=>setActive("cahier")}/>}
 
-      {active==="devis"&&<section><Header title="Devis" subtitle="Devis client imprimable, sans références internes et sans remise."/><div className="toolbar single"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom..."/></div></div><div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className="badge realise">Devis client</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button></article>)}</div></section>}
+      {active==="devis"&&<section><Header title="Devis" subtitle="Devis client imprimable, sans références internes et sans remise."/><div className="toolbar single"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom..."/></div></div><div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className="badge realise">Devis client</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button>
+                  <button onClick={()=>setEditingDevis(JSON.parse(JSON.stringify(d)))}><Edit3/>Modifier</button>
+                  <button className="danger" onClick={()=>deleteDevisClient(d.id)}><Trash2/>Supprimer</button></article>)}</div></section>}
 
       {active==="sauvegardes"&&<section>
         <Header title="Sauvegardes journalières" subtitle="À 19h, les fiches et devis du jour sont archivés en détail. Tu peux ouvrir chaque dossier quand tu veux."/>
@@ -336,6 +352,7 @@ function App(){
 
       {preview&&<PreviewModal fiche={preview} close={()=>setPreview(null)} send={()=>sendToDevis(preview)}/>}
       {archiveOpen&&<ArchiveModal archive={archiveOpen} close={()=>setArchiveOpen(null)}/>}
+      {editingDevis&&<DevisEditModal devis={editingDevis} setDevis={setEditingDevis} save={saveDevisClient} close={()=>setEditingDevis(null)}/>}
     </main>
   </div>;
 }
@@ -562,6 +579,67 @@ function ArchiveModal({archive, close}){
         <div className="preview-actions-pro">
           <button onClick={close}><X/>Fermer le dossier</button>
           <button onClick={() => printArchiveJour(archive)}><Printer/>Imprimer résumé</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function DevisEditModal({devis, setDevis, save, close}){
+  function updateLine(id, patch){
+    setDevis({...devis, lignes:(devis.lignes||[]).map((l)=>l.id===id?{...l,...patch}:l)});
+  }
+  function removeLine(id){
+    setDevis({...devis, lignes:(devis.lignes||[]).filter((l)=>l.id!==id)});
+  }
+  function addLine(){
+    setDevis({...devis, lignes:[...(devis.lignes||[]), {id:uid(), designation:"", quantite:1, prixTTC:0}]});
+  }
+
+  return (
+    <div className="modal-back">
+      <div className="modal large">
+        <div className="modal-header-pro">
+          <div>
+            <h2>Modifier le devis client</h2>
+            <p>Modification autorisée sur les informations visibles au client. Les références ne sont pas imprimées.</p>
+          </div>
+          <button onClick={close}><X/></button>
+        </div>
+
+        <div className="grid2">
+          <label>Numéro devis<input value={devis.numero || ""} onChange={(e)=>setDevis({...devis, numero:e.target.value})}/></label>
+          <label>Date<input type="date" value={devis.date || ""} onChange={(e)=>setDevis({...devis, date:e.target.value})}/></label>
+          <label>Nom client<input value={devis.clientNom || ""} onChange={(e)=>setDevis({...devis, clientNom:e.target.value})}/></label>
+          <label>Téléphone<input value={devis.clientTelephone || ""} onChange={(e)=>setDevis({...devis, clientTelephone:e.target.value})}/></label>
+          <label>Immatriculation<input value={devis.immatriculation || ""} onChange={(e)=>setDevis({...devis, immatriculation:e.target.value.toUpperCase()})}/></label>
+          <label>Véhicule<input value={devis.vehicule || ""} onChange={(e)=>setDevis({...devis, vehicule:e.target.value})}/></label>
+        </div>
+
+        <div className="line-title devis-edit-title">
+          <h3>Lignes du devis</h3>
+          <button onClick={addLine}><Plus/>Ajouter une ligne</button>
+        </div>
+
+        <div className="devis-edit-lines">
+          {(devis.lignes || []).map((l)=>(
+            <div className="devis-edit-row" key={l.id}>
+              <input placeholder="Désignation" value={l.designation || ""} onChange={(e)=>updateLine(l.id,{designation:e.target.value})}/>
+              <input type="number" placeholder="Qté" value={l.quantite || 1} onChange={(e)=>updateLine(l.id,{quantite:Number(e.target.value || 1)})}/>
+              <input type="number" placeholder="Prix TTC" value={l.prixTTC || ""} onChange={(e)=>updateLine(l.id,{prixTTC:Number(e.target.value || 0)})}/>
+              <b>{money(Number(l.quantite || 1)*Number(l.prixTTC || 0))}</b>
+              <button className="danger" onClick={()=>removeLine(l.id)}><Trash2/></button>
+            </div>
+          ))}
+        </div>
+
+        <div className="preview-total">Total TTC : {money(totalDevis(devis))}</div>
+
+        <div className="preview-actions-pro">
+          <button onClick={close}><X/>Annuler</button>
+          <button onClick={()=>printDevisClient(devis)}><Printer/>Aperçu impression</button>
+          <button className="primary" onClick={()=>save(devis)}><Save/>Enregistrer modification</button>
         </div>
       </div>
     </div>
@@ -979,13 +1057,8 @@ function printDevisClient(d){
             </table>
           </div>
 
-          <div class="bottom-zone">
-            <div class="note-box">
-              <b>Observation :</b><br>
-              Les références restent internes au magasin et ne figurent pas sur le devis client.
-              Les prix sont indiqués TTC, sous réserve de disponibilité des pièces.
-            </div>
-
+          <div class="bottom-zone totals-only">
+            <div></div>
             <div class="totals">
               <div class="totals-row"><span>Total HT</span><b>${money(totalHT)}</b></div>
               <div class="totals-row"><span>TVA 20%</span><b>${money(totalTVA)}</b></div>
@@ -994,7 +1067,7 @@ function printDevisClient(d){
           </div>
 
           <div class="conditions">
-            Ce devis est établi selon les informations communiquées par le client. Il ne vaut pas réservation définitive des pièces tant que la commande n’est pas confirmée.
+            Les références restent internes au magasin et ne figurent pas sur le devis client. Les prix sont indiqués TTC, sous réserve de disponibilité des pièces.
           </div>
 
           <div class="footer">
@@ -1009,6 +1082,109 @@ function printDevisClient(d){
     </html>
   `);
   w.document.close();
-}function printArchiveJour(a){ const rows=a.resume.map(r=>`<tr><td>${r.nom}</td><td>${r.fiches}</td><td>${r.devis}</td><td>${money(r.total)}</td></tr>`).join(""); const w=window.open("","_blank"); w.document.write(`<html><body><h1>Archive journée ${a.date}</h1><table border="1" cellpadding="8"><tr><th>Salarié</th><th>Fiches</th><th>Devis</th><th>Total</th></tr>${rows}</table><script>window.print()</script></body></html>`); w.document.close(); }
+}function printArchiveJour(a){
+  const resumeRows = (a.resume || []).map(r=>`
+    <tr>
+      <td>${r.nom}</td>
+      <td>${r.fiches}</td>
+      <td>${r.devis}</td>
+      <td>${money(r.total)}</td>
+    </tr>
+  `).join("");
+
+  const devisRows = (a.devis || []).map(d=>`
+    <tr>
+      <td>${d.numero}</td>
+      <td>${d.clientNom || ""}</td>
+      <td>${d.immatriculation || ""}</td>
+      <td>${(d.lignes || []).map(l=>`${l.designation} x${l.quantite || 1}`).join("<br>")}</td>
+      <td>${money(totalDevis(d))}</td>
+    </tr>
+  `).join("");
+
+  const fichesRows = (a.fiches || []).map(f=>`
+    <tr>
+      <td>${f.numero}</td>
+      <td>${f.clientNom || ""}</td>
+      <td>${f.immatriculation || ""}</td>
+      <td>${(f.pieces || []).map(p => {
+        const refs = selectedProps(p).map(pr => pr.reference ? `Réf: ${pr.reference}` : "").filter(Boolean).join(" / ");
+        return `${p.designation}${refs ? " — " + refs : ""}`;
+      }).join("<br>")}</td>
+      <td>${f.statut || ""}</td>
+    </tr>
+  `).join("");
+
+  const totalJour = (a.devis || []).reduce((s,d)=>s+totalDevis(d),0);
+
+  const w = window.open("", "_blank");
+  w.document.write(`
+    <html>
+      <head>
+        <title>Résumé journée ${a.date}</title>
+        <style>
+          @page{size:A4;margin:12mm}
+          body{font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:12px}
+          .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:4px solid #0b2f73;padding-bottom:12px}
+          .brand{display:flex;gap:12px;align-items:center}
+          .brand img{width:70px;height:70px;object-fit:contain}
+          h1{margin:0;color:#0b2f73;font-size:24px}
+          h2{color:#0b2f73;margin:18px 0 8px;font-size:18px}
+          .meta{text-align:right;color:#334155;line-height:1.5}
+          .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+          .card{border:1px solid #c7d7ef;border-radius:12px;padding:12px;text-align:center;background:#f8fbff}
+          .card b{display:block;color:#0b2f73;font-size:20px;margin-bottom:4px}
+          table{width:100%;border-collapse:collapse;margin-top:8px}
+          th{background:#0b2f73;color:white;text-align:left;padding:8px;font-size:11px}
+          td{border:1px solid #d8e2f3;padding:7px;vertical-align:top}
+          .footer{position:fixed;bottom:9mm;left:12mm;right:12mm;text-align:center;border-top:3px solid #0b2f73;padding-top:7px;color:#475569;font-size:10.5px}
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="brand">
+            <img src="${logo}">
+            <div>
+              <h1>${ENTREPRISE.nom}</h1>
+              <div>Résumé journalier détaillé</div>
+            </div>
+          </div>
+          <div class="meta">
+            <b>Date :</b> ${a.date}<br>
+            <b>Généré le :</b> ${today()} ${nowTime()}
+          </div>
+        </div>
+
+        <div class="summary">
+          <div class="card"><b>${(a.fiches || []).length}</b>Fiches cahier</div>
+          <div class="card"><b>${(a.devis || []).length}</b>Devis client</div>
+          <div class="card"><b>${money(totalJour)}</b>Total devis</div>
+        </div>
+
+        <h2>Résumé par salarié</h2>
+        <table>
+          <thead><tr><th>Salarié</th><th>Fiches</th><th>Devis</th><th>Total devis</th></tr></thead>
+          <tbody>${resumeRows}</tbody>
+        </table>
+
+        <h2>Devis détaillés</h2>
+        <table>
+          <thead><tr><th>N° devis</th><th>Client</th><th>Plaque</th><th>Lignes</th><th>Total TTC</th></tr></thead>
+          <tbody>${devisRows}</tbody>
+        </table>
+
+        <h2>Fiches cahier avec références</h2>
+        <table>
+          <thead><tr><th>N° fiche</th><th>Client</th><th>Plaque</th><th>Pièces / références</th><th>Statut</th></tr></thead>
+          <tbody>${fichesRows}</tbody>
+        </table>
+
+        <div class="footer">${ENTREPRISE.nom} — ${ENTREPRISE.adresse} — ${ENTREPRISE.email}</div>
+        <script>window.print()</script>
+      </body>
+    </html>
+  `);
+  w.document.close();
+}
 
 createRoot(document.getElementById("root")).render(<App />);
