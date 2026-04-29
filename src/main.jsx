@@ -330,7 +330,7 @@ function App(){
           </div>
         </div>
         <div className="actions top-actions"><button className="primary" onClick={()=>commit(closeDay(data,today()))}><Save/>Sauvegarder / clôturer aujourd’hui</button></div>
-        <div className="cards">{data.archivesJour.map(a=><article className="fiche-card" key={a.id}><h3>Dossier du {a.date}</h3><p>{a.fiches.length} fiche(s) · {a.devis.length} devis détaillé(s)</p><div className="mini-pieces">{a.resume.map(r=><span key={r.userId}>{r.nom}: {r.fiches} fiches / {r.devis} devis</span>)}</div><div className="actions"><button onClick={()=>setArchiveOpen(a)}><Eye/>Ouvrir le dossier</button><button onClick={()=>printArchiveJour(a)}><Printer/>Imprimer résumé</button></div></article>)}</div></section>}
+        <div className="cards">{data.archivesJour.map(a=><article className="fiche-card" key={a.id}><h3>Dossier du {a.date}</h3><p>{a.fiches.length} fiche(s) · {a.devis.length} devis détaillé(s)</p><div className="mini-pieces">{a.resume.map(r=><span key={r.userId}>{r.nom}: {r.fiches} fiches / {r.devis} devis</span>)}</div><div className="actions"><button onClick={()=>setArchiveOpen(a)}><Eye/>Ouvrir le dossier complet</button><button onClick={()=>printArchiveJour(a)}><Printer/>Imprimer résumé</button></div></article>)}</div></section>}
 
       {active==="users"&&currentUser.role==="admin"&&<section><Header title="Utilisateurs" subtitle="Créer et supprimer les comptes salariés."/><div className="user-grid"><div className="panel"><h3>Créer utilisateur</h3><input placeholder="Nom" value={userForm.nom} onChange={e=>setUserForm({...userForm,nom:e.target.value})}/><input placeholder="Identifiant" value={userForm.identifiant} onChange={e=>setUserForm({...userForm,identifiant:e.target.value})}/><input placeholder="Mot de passe" value={userForm.motDePasse} onChange={e=>setUserForm({...userForm,motDePasse:e.target.value})}/><select value={userForm.role} onChange={e=>setUserForm({...userForm,role:e.target.value})}><option value="salarie">Salarié</option><option value="admin">Admin</option></select><button className="primary" onClick={()=>{if(!userForm.nom||!userForm.identifiant||!userForm.motDePasse)return alert("Remplis tout.");commit({...data,users:[...data.users,{...userForm,id:uid()}]});setUserForm({nom:"",identifiant:"",motDePasse:"",role:"salarie"});}}><Plus/>Ajouter</button></div><div className="panel"><h3>Liste</h3>{data.users.map(u=><div className="user-row" key={u.id}><div><b>{u.nom}</b><small>{u.identifiant} · {u.role} · mot de passe : {u.motDePasse}</small></div>{u.id!==currentUser.id&&<button className="danger" onClick={()=>{if(confirm("Supprimer ?"))commit({...data,users:data.users.filter(x=>x.id!==u.id)})}}><Trash2/>Supprimer</button>}</div>)}</div></div></section>}
 
@@ -343,7 +343,7 @@ function App(){
 function ListResume({items, open}){ return <div className="today-list">{items.map(f=><button key={f.id} onClick={()=>open(f)}><span><b>{f.immatriculation||f.clientTelephone||"Sans plaque"}</b><small>{f.date} {f.heureCreation} · {f.statut}</small></span><strong>{f.pieces?.length||splitPieces(f.demandeRapide).length} pièce(s)</strong></button>)}</div>; }
 
 function FicheCard({f,currentUser,canEdit,canDelete,open,preview,del}){
-  return <article className="fiche-card"><div className="card-top"><div><b>{f.numero}</b><small>{f.date} {f.heureCreation} · {f.creeParNom}</small></div><span className={`badge ${f.statut}`}>{f.statut==="realise"?"Réalisé":f.statut==="en_cours"?"En cours":"En attente"}</span></div><h3>{f.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{f.immatriculation||"Plaque non renseignée"} — {vehicleName(f)||"Véhicule non renseigné"}</p><div className="mini-pieces">{((f.pieces||[]).length?f.pieces:splitPieces(f.demandeRapide).map(x=>({id:x,designation:x}))).slice(0,5).map(p=><span key={p.id}>{p.designation}</span>)}</div>{currentUser.role!=="admin"&&f.creeParId!==currentUser.id&&<div className="external-warning">Fiche déjà faite par {f.creeParNom}. Consultation par plaque uniquement.</div>}<div className="actions"><button onClick={preview}><Eye/>Afficher l’intégralité</button>{canEdit&&<button onClick={open}><Edit3/>Ouvrir</button>}{canDelete&&<button className="danger" onClick={del}><Trash2/>Supprimer</button>}</div></article>;
+  return <article className="fiche-card"><div className="card-top"><div><b>{f.numero}</b><small>{f.date} {f.heureCreation} · {f.creeParNom}</small></div><span className={`badge ${f.statut}`}>{f.statut==="realise"?"Réalisé":f.statut==="en_cours"?"En cours":"En attente"}</span></div><h3>{f.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{f.immatriculation||"Plaque non renseignée"} — {vehicleName(f)||"Véhicule non renseigné"}</p><div className="mini-pieces">{((f.pieces||[]).length?f.pieces:splitPieces(f.demandeRapide).map(x=>({id:x,designation:x}))).slice(0,5).map(p=><span key={p.id}>{p.designation}</span>)}</div>{currentUser.role!=="admin"&&f.creeParId!==currentUser.id&&<div className="external-warning">Fiche déjà faite par {f.creeParNom}. Consultation par plaque uniquement.</div>}<div className="actions"><button onClick={preview}><Eye/>Consultation détaillée</button>{canEdit&&<button onClick={open}><Edit3/>Ouvrir</button>}{canDelete&&<button className="danger" onClick={del}><Trash2/>Supprimer</button>}</div></article>;
 }
 
 function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, sendToDevis, setPreview, cancel }){
@@ -356,19 +356,659 @@ function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, s
   function removeProp(pid,idx){ setEditing({...editing,pieces:(editing.pieces||[]).map(p=>{if(p.id!==pid)return p;if((p.propositions||[]).length<=1){alert("Minimum une proposition.");return p;}return {...p,propositions:p.propositions.filter((_,i)=>i!==idx).map((pr,i)=>({...pr,numero:i+1}))};})}); }
   function imageProp(file,pid,idx){ const r=new FileReader(); r.onload=()=>updateProp(pid,idx,{image:r.result}); r.readAsDataURL(file); }
   function prepare(){ const names=splitPieces(editing.demandeRapide); if(!names.length)return alert("Écris la liste de pièces."); const ex=(editing.pieces||[]).map(p=>p.designation.toLowerCase()); const newP=names.filter(n=>!ex.includes(n.toLowerCase())).map(n=>emptyPiece(n)); const pieces=[...(editing.pieces||[]),...newP]; setEditing({...editing,pieces,statut:"en_cours"}); setOpenPieceId(pieces[0]?.id||""); }
-  return <section><Header title="Cahier Pro — recherche" subtitle="Mise en attente sous la demande rapide, puis recherche et envoi vers devis."/><div className="editor"><div className="panel"><h3>Informations client / véhicule</h3><div className="grid2"><label>Numéro<input value={editing.numero} onChange={e=>setField("numero",e.target.value)}/></label><label>Date<input type="date" value={editing.date} onChange={e=>setField("date",e.target.value)}/></label><label>Heure<input value={editing.heureCreation||""} onChange={e=>setField("heureCreation",e.target.value)}/></label><label>Statut<select value={editing.statut} onChange={e=>setField("statut",e.target.value)}><option value="en_attente">En attente</option><option value="en_cours">En cours</option><option value="realise">Réalisé</option></select></label><label>Nom client<input value={editing.clientNom} onChange={e=>setField("clientNom",e.target.value)}/></label><label>Téléphone<input value={editing.clientTelephone} onChange={e=>setField("clientTelephone",e.target.value)}/></label><label>Immatriculation<input value={editing.immatriculation} onChange={e=>setField("immatriculation",e.target.value.toUpperCase())}/></label><label>VIN<input maxLength="17" value={editing.vin} onChange={e=>setField("vin",e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""))}/></label><label>Marque automatique<select value={editing.marque} onChange={e=>setEditing({...editing,marque:e.target.value,modele:""})}><option value="">Sélectionner</option>{CAR_BRANDS.map(m=><option key={m}>{m}</option>)}</select></label><label>Modèle automatique<select value={editing.modele} disabled={!editing.marque} onChange={e=>setField("modele",e.target.value)}><option value="">Sélectionner</option>{(CAR_MODELS[editing.marque]||[]).map(m=><option key={m}>{m}</option>)}</select></label><label>Marque manuelle<input value={editing.marqueManuelle||""} onChange={e=>setField("marqueManuelle",e.target.value)}/></label><label>Modèle manuel<input value={editing.modeleManuel||""} onChange={e=>setField("modeleManuel",e.target.value)}/></label><label>Finition / motorisation<input value={editing.finition} onChange={e=>setField("finition",e.target.value)}/></label></div></div><div className="panel demande-client"><div className="line-title"><div><h3>Demande rapide</h3><p className="muted">Liste donnée par le client, une pièce par ligne.</p></div><button onClick={prepare}><ClipboardList/>Commencer la recherche</button></div><textarea className="big-request" value={editing.demandeRapide} onChange={e=>setField("demandeRapide",e.target.value)} placeholder={"Kit embrayage\nKit distribution\nFiltre à air\nFiltre à huile"}/><div className="quick-actions"><button className="primary" onClick={()=>saveFiche({...editing,statut:"en_attente"})}><Clock/>Mettre en attente</button><button onClick={()=>setField("demandeRapide","")}><X/>Vider</button></div></div><div className="panel"><div className="line-title"><h3>Recherche détaillée</h3><button onClick={()=>{const p=emptyPiece("");setEditing({...editing,pieces:[...(editing.pieces||[]),p],statut:"en_cours"});setOpenPieceId(p.id)}}><Plus/>Ajouter pièce</button></div><div className="request-preview">{(editing.pieces||[]).map((p,i)=><button key={p.id} className={openPieceId===p.id?"tab-on":""} onClick={()=>setOpenPieceId(p.id)}>{i+1}. {p.designation||"Pièce sans nom"}</button>)}</div>{!piece?<div className="waiting-panel">Clique sur “Commencer la recherche”.</div>:<div className="piece-box"><div className="piece-head"><b>{piece.designation}</b><button className="danger" onClick={()=>{const rest=editing.pieces.filter(p=>p.id!==piece.id);setEditing({...editing,pieces:rest});setOpenPieceId(rest[0]?.id||"")}}><Trash2/></button></div><div className="grid2"><label>Nom pièce<input value={piece.designation} onChange={e=>updatePiece(piece.id,{designation:e.target.value})}/></label><label>Quantité<input type="number" value={piece.quantite||1} onChange={e=>updatePiece(piece.id,{quantite:e.target.value})}/></label></div><div className="line-title proposition-toolbar"><div><h4>Propositions</h4><small>Prix saisi en TTC. Les références ne sortent pas sur le devis client.</small></div><button onClick={()=>addProp(piece.id)}><Plus/>Ajouter proposition</button></div><div className="two-proposals">{(piece.propositions||[]).map((pr,idx)=><div className={`simple-proposal ${pr.selectionnee?"selected-proposal":""}`} key={pr.id}><div className="proposal-head"><b>Proposition {idx+1}</b><div className="proposal-head-actions"><label className="radio-choice"><input type="checkbox" checked={!!pr.selectionnee} onChange={e=>toggleProp(piece.id,idx,e.target.checked)}/>Sélectionner</label>{(piece.propositions||[]).length>1&&<button className="danger" onClick={()=>removeProp(piece.id,idx)}><Trash2/>Supprimer</button>}</div></div><div className="grid2"><label>Référence<input value={pr.reference||""} onChange={e=>updateProp(piece.id,idx,{reference:e.target.value})}/></label><label>Marque / fournisseur<input value={pr.marque||""} onChange={e=>updateProp(piece.id,idx,{marque:e.target.value})}/></label><label>Prix TTC<input type="number" value={pr.prix||""} onChange={e=>updateProp(piece.id,idx,{prix:e.target.value})}/></label><label>Note<input value={pr.note||""} onChange={e=>updateProp(piece.id,idx,{note:e.target.value})}/></label></div><div className="image-line proposition-image-line">{pr.image?<img src={pr.image}/>:<div className="empty-img"><ImagePlus/>Image réf.</div>}<label className="upload"><ImagePlus/>Ajouter image<input type="file" accept="image/*" onChange={e=>e.target.files?.[0]&&imageProp(e.target.files[0],piece.id,idx)}/></label>{pr.image&&<button className="danger" onClick={()=>updateProp(piece.id,idx,{image:""})}><Trash2/>Retirer</button>}</div></div>)}</div></div>}</div><div className="bottom-actions"><button onClick={cancel}><X/>Retour</button><button onClick={()=>setPreview(editing)}><Eye/>Afficher l’intégralité du devis</button><button className="primary" onClick={()=>saveFiche({...editing,statut: isRechercheTerminee(editing) ? "realise" : "en_cours"})}><Save/>Enregistrer dans le cahier</button><button onClick={()=>sendToDevis({...editing,statut:"realise"})}><Send/>Envoyer vers devis</button></div></div></section>;
+  return <section><Header title="Cahier Pro — recherche" subtitle="Mise en attente sous la demande rapide, puis recherche et envoi vers devis."/><div className="editor"><div className="panel"><h3>Informations client / véhicule</h3><div className="grid2"><label>Numéro<input value={editing.numero} onChange={e=>setField("numero",e.target.value)}/></label><label>Date<input type="date" value={editing.date} onChange={e=>setField("date",e.target.value)}/></label><label>Heure<input value={editing.heureCreation||""} onChange={e=>setField("heureCreation",e.target.value)}/></label><label>Statut<select value={editing.statut} onChange={e=>setField("statut",e.target.value)}><option value="en_attente">En attente</option><option value="en_cours">En cours</option><option value="realise">Réalisé</option></select></label><label>Nom client<input value={editing.clientNom} onChange={e=>setField("clientNom",e.target.value)}/></label><label>Téléphone<input value={editing.clientTelephone} onChange={e=>setField("clientTelephone",e.target.value)}/></label><label>Immatriculation<input value={editing.immatriculation} onChange={e=>setField("immatriculation",e.target.value.toUpperCase())}/></label><label>VIN<input maxLength="17" value={editing.vin} onChange={e=>setField("vin",e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""))}/></label><label>Marque automatique<select value={editing.marque} onChange={e=>setEditing({...editing,marque:e.target.value,modele:""})}><option value="">Sélectionner</option>{CAR_BRANDS.map(m=><option key={m}>{m}</option>)}</select></label><label>Modèle automatique<select value={editing.modele} disabled={!editing.marque} onChange={e=>setField("modele",e.target.value)}><option value="">Sélectionner</option>{(CAR_MODELS[editing.marque]||[]).map(m=><option key={m}>{m}</option>)}</select></label><label>Marque manuelle<input value={editing.marqueManuelle||""} onChange={e=>setField("marqueManuelle",e.target.value)}/></label><label>Modèle manuel<input value={editing.modeleManuel||""} onChange={e=>setField("modeleManuel",e.target.value)}/></label><label>Finition / motorisation<input value={editing.finition} onChange={e=>setField("finition",e.target.value)}/></label></div></div><div className="panel demande-client"><div className="line-title"><div><h3>Demande rapide</h3><p className="muted">Liste donnée par le client, une pièce par ligne.</p></div><button onClick={prepare}><ClipboardList/>Commencer la recherche</button></div><textarea className="big-request" value={editing.demandeRapide} onChange={e=>setField("demandeRapide",e.target.value)} placeholder={"Kit embrayage\nKit distribution\nFiltre à air\nFiltre à huile"}/><div className="quick-actions"><button className="primary" onClick={()=>saveFiche({...editing,statut:"en_attente"})}><Clock/>Mettre en attente</button><button onClick={()=>setField("demandeRapide","")}><X/>Vider</button></div></div><div className="panel"><div className="line-title"><h3>Recherche détaillée</h3><button onClick={()=>{const p=emptyPiece("");setEditing({...editing,pieces:[...(editing.pieces||[]),p],statut:"en_cours"});setOpenPieceId(p.id)}}><Plus/>Ajouter pièce</button></div><div className="request-preview">{(editing.pieces||[]).map((p,i)=><button key={p.id} className={openPieceId===p.id?"tab-on":""} onClick={()=>setOpenPieceId(p.id)}>{i+1}. {p.designation||"Pièce sans nom"}</button>)}</div>{!piece?<div className="waiting-panel">Clique sur “Commencer la recherche”.</div>:<div className="piece-box"><div className="piece-head"><b>{piece.designation}</b><button className="danger" onClick={()=>{const rest=editing.pieces.filter(p=>p.id!==piece.id);setEditing({...editing,pieces:rest});setOpenPieceId(rest[0]?.id||"")}}><Trash2/></button></div><div className="grid2"><label>Nom pièce<input value={piece.designation} onChange={e=>updatePiece(piece.id,{designation:e.target.value})}/></label><label>Quantité<input type="number" value={piece.quantite||1} onChange={e=>updatePiece(piece.id,{quantite:e.target.value})}/></label></div><div className="line-title proposition-toolbar"><div><h4>Propositions</h4><small>Prix saisi en TTC. Les références ne sortent pas sur le devis client.</small></div><button onClick={()=>addProp(piece.id)}><Plus/>Ajouter proposition</button></div><div className="two-proposals">{(piece.propositions||[]).map((pr,idx)=><div className={`simple-proposal ${pr.selectionnee?"selected-proposal":""}`} key={pr.id}><div className="proposal-head"><b>Proposition {idx+1}</b><div className="proposal-head-actions"><label className="radio-choice"><input type="checkbox" checked={!!pr.selectionnee} onChange={e=>toggleProp(piece.id,idx,e.target.checked)}/>Sélectionner</label>{(piece.propositions||[]).length>1&&<button className="danger" onClick={()=>removeProp(piece.id,idx)}><Trash2/>Supprimer</button>}</div></div><div className="grid2"><label>Référence<input value={pr.reference||""} onChange={e=>updateProp(piece.id,idx,{reference:e.target.value})}/></label><label>Marque / fournisseur<input value={pr.marque||""} onChange={e=>updateProp(piece.id,idx,{marque:e.target.value})}/></label><label>Prix TTC<input type="number" value={pr.prix||""} onChange={e=>updateProp(piece.id,idx,{prix:e.target.value})}/></label><label>Note<input value={pr.note||""} onChange={e=>updateProp(piece.id,idx,{note:e.target.value})}/></label></div><div className="image-line proposition-image-line">{pr.image?<img src={pr.image}/>:<div className="empty-img"><ImagePlus/>Image réf.</div>}<label className="upload"><ImagePlus/>Ajouter image<input type="file" accept="image/*" onChange={e=>e.target.files?.[0]&&imageProp(e.target.files[0],piece.id,idx)}/></label>{pr.image&&<button className="danger" onClick={()=>updateProp(piece.id,idx,{image:""})}><Trash2/>Retirer</button>}</div></div>)}</div></div>}</div><div className="bottom-actions"><button onClick={cancel}><X/>Retour</button><button onClick={()=>setPreview(editing)}><Eye/>Consultation détaillée du devis</button><button className="primary" onClick={()=>saveFiche({...editing,statut: isRechercheTerminee(editing) ? "realise" : "en_cours"})}><Save/>Enregistrer dans le cahier</button><button onClick={()=>sendToDevis({...editing,statut:"realise"})}><Send/>Envoyer vers devis</button></div></div></section>;
 }
 
-function PreviewModal({fiche, close, send}){ return <div className="modal-back"><div className="modal"><div className="line-title"><h2>Aperçu intégral — {fiche.numero}</h2><button onClick={close}><X/></button></div><div className="preview-info"><b>{fiche.clientNom}</b><span>{fiche.immatriculation} · {vehicleName(fiche)} · {fiche.statut}</span></div><table className="preview-table"><thead><tr><th>Pièce</th><th>Qté</th><th>Propositions sélectionnées</th><th>Total TTC</th></tr></thead><tbody>{(fiche.pieces||[]).map(p=><tr key={p.id}><td>{p.designation}</td><td>{p.quantite||1}</td><td>{selectedProps(p).map((pr,i)=><div key={pr.id}>Prop. {i+1} : {pr.reference} · {pr.marque} · {money(pr.prix)}</div>)}</td><td>{money(selectedProps(p).reduce((s,pr)=>s+Number(pr.prix||0)*Number(p.quantite||1),0))}</td></tr>)}</tbody></table><div className="preview-total">Total sélectionné : {money(totalFiche(fiche))}</div><div className="actions"><button onClick={send}><Send/>Envoyer vers devis</button></div></div></div>; }
-function ArchiveModal({archive, close}){ return <div className="modal-back"><div className="modal large"><div className="line-title"><h2>Dossier sauvegarde du {archive.date}</h2><button onClick={close}><X/></button></div><h3>Résumé</h3><div className="employee-table"><div className="employee-head"><span>Salarié</span><span>Fiches</span><span>Devis</span><span>Total</span></div>{archive.resume.map(r=><div className="employee-row" key={r.userId}><b>{r.nom}</b><span>{r.fiches}</span><span>{r.devis}</span><span>{money(r.total)}</span></div>)}</div><h3>Devis détaillés</h3><div className="cards">{archive.devis.map(d=><article className="fiche-card" key={d.id}><b>{d.numero}</b><small>{d.clientNom} · {d.immatriculation}</small><div className="mini-pieces">{(d.lignes||[]).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer</button></article>)}</div><h3>Fiches du cahier</h3><div className="cards">{archive.fiches.map(f=><article className="fiche-card" key={f.id}><b>{f.numero}</b><small>{f.clientNom} · {f.immatriculation} · {f.statut}</small><div className="mini-pieces">{(f.pieces||[]).map(p=><span key={p.id}>{p.designation}</span>)}</div></article>)}</div></div></div>; }
+function PreviewModal({fiche, close, send}){
+  const total = totalFiche(fiche);
+  const pieces = fiche.pieces || [];
+
+  return (
+    <div className="modal-back">
+      <div className="modal large">
+        <div className="modal-header-pro">
+          <div>
+            <h2>Aperçu professionnel de la recherche</h2>
+            <p>Contrôle interne avant enregistrement ou envoi vers devis client.</p>
+          </div>
+          <button onClick={close}><X/></button>
+        </div>
+
+        <div className="preview-pro-top">
+          <div className="preview-pro-brand">
+            <img src={logo}/>
+            <div>
+              <b>{ENTREPRISE.nom}</b>
+              <span>Fiche de recherche pièces</span>
+            </div>
+          </div>
+          <div className="preview-pro-number">
+            <strong>{fiche.numero}</strong>
+            <span>{fiche.date} · {fiche.heureCreation}</span>
+          </div>
+        </div>
+
+        <div className="preview-pro-grid">
+          <div className="preview-pro-box">
+            <label>Client</label>
+            <strong>{fiche.clientNom || "Non renseigné"}</strong>
+            <span>{fiche.clientTelephone || "Téléphone non renseigné"}</span>
+          </div>
+          <div className="preview-pro-box">
+            <label>Véhicule</label>
+            <strong>{vehicleName(fiche) || "Non renseigné"}</strong>
+            <span>Plaque : {fiche.immatriculation || "Non renseignée"} · VIN : {fiche.vin || "Non renseigné"}</span>
+          </div>
+          <div className="preview-pro-box">
+            <label>Salarié</label>
+            <strong>{fiche.creeParNom || "Non renseigné"}</strong>
+            <span>Statut : {fiche.statut === "realise" ? "Réalisé" : fiche.statut === "en_cours" ? "En cours" : "En attente"}</span>
+          </div>
+        </div>
+
+        <div className="preview-section-title">
+          <h3>Pièces et propositions sélectionnées</h3>
+          <b>Total sélectionné : {money(total)}</b>
+        </div>
+
+        <div className="preview-piece-list">
+          {pieces.map((p, index) => (
+            <div className="preview-piece-card" key={p.id}>
+              <div className="preview-piece-head">
+                <b>{index + 1}. {p.designation || "Pièce sans nom"}</b>
+                <span>Quantité : {p.quantite || 1}</span>
+              </div>
+
+              <div className="preview-proposals-grid">
+                {selectedProps(p).map((pr, i) => (
+                  <div className="preview-proposal-card" key={pr.id}>
+                    <div className="preview-proposal-title">
+                      <b>Proposition {i + 1}</b>
+                      <strong>{money(Number(pr.prix || 0) * Number(p.quantite || 1))}</strong>
+                    </div>
+                    <div className="preview-proposal-details">
+                      <span><b>Référence :</b> {pr.reference || "Non renseignée"}</span>
+                      <span><b>Marque / fournisseur :</b> {pr.marque || "Non renseigné"}</span>
+                      <span><b>Prix TTC unitaire :</b> {money(pr.prix)}</span>
+                      <span><b>Note :</b> {pr.note || "—"}</span>
+                    </div>
+                    {pr.image && <img className="preview-ref-image" src={pr.image}/>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {!pieces.length && (
+            <div className="preview-empty">
+              Aucune pièce détaillée. Commence la recherche pour générer les lignes.
+            </div>
+          )}
+        </div>
+
+        <div className="preview-actions-pro">
+          <button onClick={close}><X/>Fermer</button>
+          <button className="primary" onClick={send}><Send/>Envoyer vers devis client</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArchiveModal({archive, close}){
+  const [tab, setTab] = React.useState("devis");
+  const totalDevisJour = (archive.devis || []).reduce((s, d) => s + totalDevis(d), 0);
+
+  return (
+    <div className="modal-back">
+      <div className="modal archive-modal">
+        <div className="modal-header-pro">
+          <div>
+            <h2>Dossier journalier du {archive.date}</h2>
+            <p>Archive complète : fiches du cahier, devis détaillés et résumé par salarié.</p>
+          </div>
+          <button onClick={close}><X/></button>
+        </div>
+
+        <div className="archive-summary-grid">
+          <div><b>{archive.fiches?.length || 0}</b><span>Fiches cahier</span></div>
+          <div><b>{archive.devis?.length || 0}</b><span>Devis archivés</span></div>
+          <div><b>{money(totalDevisJour)}</b><span>Total devis</span></div>
+        </div>
+
+        <div className="archive-tabs">
+          <button className={tab === "devis" ? "on" : ""} onClick={() => setTab("devis")}>Devis détaillés</button>
+          <button className={tab === "fiches" ? "on" : ""} onClick={() => setTab("fiches")}>Fiches cahier</button>
+          <button className={tab === "resume" ? "on" : ""} onClick={() => setTab("resume")}>Résumé salariés</button>
+        </div>
+
+        {tab === "devis" && (
+          <div className="archive-list">
+            {(archive.devis || []).map((d) => (
+              <div className="archive-devis-card" key={d.id}>
+                <div className="archive-devis-head">
+                  <div>
+                    <b>{d.numero}</b>
+                    <span>{d.clientNom || "Client non renseigné"} · {d.immatriculation || "Sans plaque"} · {d.vehicule || ""}</span>
+                  </div>
+                  <strong>{money(totalDevis(d))}</strong>
+                </div>
+
+                <table className="archive-lines-table">
+                  <thead>
+                    <tr>
+                      <th>Désignation</th>
+                      <th>Qté</th>
+                      <th>Prix TTC</th>
+                      <th>Total TTC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(d.lignes || []).map((l) => (
+                      <tr key={l.id}>
+                        <td>{l.designation}</td>
+                        <td>{l.quantite || 1}</td>
+                        <td>{money(l.prixTTC)}</td>
+                        <td>{money(Number(l.quantite || 1) * Number(l.prixTTC || 0))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="actions">
+                  <button onClick={() => printDevisClient(d)}><Printer/>Imprimer ce devis</button>
+                </div>
+              </div>
+            ))}
+
+            {!(archive.devis || []).length && <div className="preview-empty">Aucun devis dans ce dossier.</div>}
+          </div>
+        )}
+
+        {tab === "fiches" && (
+          <div className="archive-list">
+            {(archive.fiches || []).map((f) => (
+              <div className="archive-devis-card" key={f.id}>
+                <div className="archive-devis-head">
+                  <div>
+                    <b>{f.numero}</b>
+                    <span>{f.clientNom || "Client non renseigné"} · {f.immatriculation || "Sans plaque"} · {f.statut}</span>
+                  </div>
+                  <strong>{money(totalFiche(f))}</strong>
+                </div>
+                <div className="mini-pieces">
+                  {(f.pieces || []).map((p) => <span key={p.id}>{p.designation}</span>)}
+                </div>
+              </div>
+            ))}
+
+            {!(archive.fiches || []).length && <div className="preview-empty">Aucune fiche dans ce dossier.</div>}
+          </div>
+        )}
+
+        {tab === "resume" && (
+          <div className="employee-table archive-employee-table">
+            <div className="employee-head">
+              <span>Salarié</span><span>Fiches</span><span>Devis</span><span>Total</span>
+            </div>
+            {(archive.resume || []).map((r) => (
+              <div className="employee-row" key={r.userId}>
+                <b>{r.nom}</b><span>{r.fiches}</span><span>{r.devis}</span><span>{money(r.total)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="preview-actions-pro">
+          <button onClick={close}><X/>Fermer le dossier</button>
+          <button onClick={() => printArchiveJour(archive)}><Printer/>Imprimer résumé</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function printDevisClient(d){
-  const rows=(d.lignes||[]).map((l,i)=>{const unit=Number(l.prixTTC||0), q=Number(l.quantite||1), ht=htFromTtc(unit), tva=tvaFromTtc(unit), total=q*unit; return `<tr><td>${i+1}</td><td>${l.designation||""}</td><td>${q}</td><td>${money(ht)}</td><td>${money(tva)}</td><td>${money(unit)}</td><td>${money(total)}</td></tr>`;}).join("");
-  const totalTTC=totalDevis(d), totalHT=htFromTtc(totalTTC), totalTVA=tvaFromTtc(totalTTC);
-  const w=window.open("","_blank");
-  w.document.write(`<html><head><title>${d.numero}</title><style>@page{size:A4;margin:12mm}body{font-family:Arial;color:#0b1b45}.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:4px solid #123f91;padding-bottom:12px}.brand{display:flex;gap:12px;align-items:center}.brand img{width:72px}.brand h1{font-size:26px;margin:0;color:#123f91}.doc-title{text-align:right}.doc-title h2{font-size:28px;margin:0;color:#123f91}.info{font-size:12px;line-height:1.4}.boxes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.box{border:1px solid #bdd1f2;border-radius:10px;padding:12px;min-height:90px}.box h3{margin:0 0 8px;color:#123f91;font-size:16px}table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}th{background:#123f91;color:#fff;text-align:left;padding:9px}td{border:1px solid #cbd8ee;padding:8px}.totals{margin-top:220px;margin-left:auto;width:310px;border:1px solid #cbd8ee;border-radius:10px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #cbd8ee;font-weight:700}.totals .grand{background:#000;color:#fff;font-size:18px}.footer{position:fixed;bottom:10mm;left:12mm;right:12mm;text-align:center;border-top:3px solid #123f91;padding-top:8px;font-size:11px}</style></head><body><div class="top"><div class="brand"><img src="${logo}"><div><h1>${ENTREPRISE.nom}</h1><div class="info">📍 ${ENTREPRISE.adresse}<br>✉️ ${ENTREPRISE.email}<br>☎️ ${ENTREPRISE.tel} — WhatsApp ${ENTREPRISE.whatsapp}</div></div></div><div class="doc-title"><h2>DEVIS</h2><b>N° : ${d.numero}</b><br><b>Date : ${d.date}</b></div></div><div class="boxes"><div class="box"><h3>Client</h3><b>Nom :</b> ${d.clientNom||""}<br><b>Téléphone :</b> ${d.clientTelephone||""}</div><div class="box"><h3>Véhicule</h3><b>Marque / modèle :</b> ${d.vehicule||""}<br><b>Immatriculation :</b> ${d.immatriculation||""}<br><b>VIN :</b> ${d.vin||""}</div></div><div class="box" style="margin-top:12px"><h3>Détail du devis</h3><table><thead><tr><th>N°</th><th>Désignation</th><th>Quantité</th><th>Prix HT</th><th>TVA</th><th>Prix TTC</th><th>Total TTC</th></tr></thead><tbody>${rows}</tbody></table></div><div class="totals"><div><span>Total HT</span><b>${money(totalHT)}</b></div><div><span>TVA 20%</span><b>${money(totalTVA)}</b></div><div class="grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div></div><div class="footer">${ENTREPRISE.nom} — ${ENTREPRISE.adresse}<br>Email : ${ENTREPRISE.email} — Téléphone : ${ENTREPRISE.tel} — WhatsApp : ${ENTREPRISE.whatsapp}<br>TVA : ${ENTREPRISE.tvaNumber}</div><script>window.print()</script></body></html>`);
+  const lignes = d.lignes || [];
+  const rows = lignes.map((l, i) => {
+    const unitTTC = Number(l.prixTTC || 0);
+    const qty = Number(l.quantite || 1);
+    const unitHT = htFromTtc(unitTTC);
+    const lineTTC = qty * unitTTC;
+    const lineHT = qty * unitHT;
+    return `
+      <tr>
+        <td class="num">${i + 1}</td>
+        <td class="designation">${l.designation || ""}</td>
+        <td class="qty">${qty}</td>
+        <td class="price">${money(unitHT)}</td>
+        <td class="price">${money(unitTTC)}</td>
+        <td class="price total-line">${money(lineTTC)}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const totalTTC = totalDevis(d);
+  const totalHT = htFromTtc(totalTTC);
+  const totalTVA = tvaFromTtc(totalTTC);
+
+  const w = window.open("", "_blank");
+  w.document.write(`
+    <html>
+      <head>
+        <title>${d.numero}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 12mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #111827;
+            background: #ffffff;
+            font-size: 12px;
+          }
+
+          .page {
+            width: 100%;
+            min-height: 100%;
+          }
+
+          .header {
+            display: grid;
+            grid-template-columns: 1.2fr .8fr;
+            gap: 20px;
+            align-items: start;
+            padding-bottom: 14px;
+            border-bottom: 4px solid #0b2f73;
+          }
+
+          .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+          }
+
+          .brand img {
+            width: 72px;
+            height: 72px;
+            object-fit: contain;
+          }
+
+          .brand h1 {
+            margin: 0;
+            font-size: 26px;
+            color: #0b2f73;
+            letter-spacing: .3px;
+          }
+
+          .brand .subtitle {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #334155;
+            font-weight: 700;
+          }
+
+          .company {
+            margin-top: 7px;
+            line-height: 1.45;
+            color: #334155;
+            font-size: 11px;
+          }
+
+          .doc-box {
+            text-align: right;
+          }
+
+          .doc-box h2 {
+            margin: 0;
+            color: #0b2f73;
+            font-size: 32px;
+            letter-spacing: 1px;
+          }
+
+          .doc-meta {
+            margin-top: 10px;
+            display: inline-grid;
+            gap: 5px;
+            text-align: left;
+            border: 1px solid #c7d7ef;
+            border-radius: 12px;
+            padding: 10px 12px;
+            background: #f8fbff;
+            min-width: 210px;
+          }
+
+          .doc-meta div {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+          }
+
+          .doc-meta span {
+            color: #64748b;
+            font-weight: 700;
+          }
+
+          .doc-meta b {
+            color: #0b2f73;
+          }
+
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+          }
+
+          .info-card {
+            border: 1px solid #c7d7ef;
+            border-radius: 14px;
+            overflow: hidden;
+            min-height: 112px;
+          }
+
+          .info-title {
+            background: #f1f6ff;
+            color: #0b2f73;
+            font-weight: 900;
+            padding: 9px 12px;
+            border-bottom: 1px solid #c7d7ef;
+            font-size: 14px;
+          }
+
+          .info-body {
+            padding: 11px 12px;
+            display: grid;
+            gap: 6px;
+            line-height: 1.35;
+          }
+
+          .line {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 8px;
+          }
+
+          .line span {
+            color: #64748b;
+            font-weight: 800;
+          }
+
+          .line b {
+            color: #111827;
+          }
+
+          .details {
+            margin-top: 16px;
+            border: 1px solid #c7d7ef;
+            border-radius: 14px;
+            overflow: hidden;
+          }
+
+          .details-title {
+            background: #f1f6ff;
+            color: #0b2f73;
+            font-size: 15px;
+            font-weight: 900;
+            padding: 10px 12px;
+            border-bottom: 1px solid #c7d7ef;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+          }
+
+          th {
+            background: #0b2f73;
+            color: #ffffff;
+            text-align: left;
+            padding: 10px 8px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .25px;
+          }
+
+          td {
+            border-bottom: 1px solid #d8e2f3;
+            border-right: 1px solid #d8e2f3;
+            padding: 9px 8px;
+            vertical-align: middle;
+          }
+
+          tr:last-child td {
+            border-bottom: none;
+          }
+
+          td:last-child,
+          th:last-child {
+            border-right: none;
+          }
+
+          .num {
+            width: 42px;
+            text-align: center;
+            color: #0b2f73;
+            font-weight: 900;
+          }
+
+          .designation {
+            font-weight: 700;
+            color: #111827;
+          }
+
+          .qty {
+            width: 70px;
+            text-align: center;
+            font-weight: 800;
+          }
+
+          .price {
+            width: 110px;
+            text-align: right;
+            white-space: nowrap;
+            font-weight: 800;
+          }
+
+          .total-line {
+            color: #000;
+            font-weight: 900;
+          }
+
+          .bottom-zone {
+            display: grid;
+            grid-template-columns: 1fr 330px;
+            gap: 18px;
+            align-items: end;
+            margin-top: 22px;
+          }
+
+          .note-box {
+            border: 1px solid #d8e2f3;
+            border-radius: 14px;
+            padding: 12px;
+            min-height: 95px;
+            background: #fbfdff;
+            color: #334155;
+            line-height: 1.5;
+          }
+
+          .note-box b {
+            color: #0b2f73;
+          }
+
+          .totals {
+            border: 1px solid #c7d7ef;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #ffffff;
+          }
+
+          .totals-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 11px 12px;
+            border-bottom: 1px solid #d8e2f3;
+            font-weight: 800;
+          }
+
+          .totals-row span {
+            color: #334155;
+          }
+
+          .totals-row b {
+            color: #0b2f73;
+          }
+
+          .totals-row.grand {
+            background: #000000;
+            color: #ffffff;
+            border-bottom: none;
+            font-size: 18px;
+            padding: 13px 12px;
+          }
+
+          .totals-row.grand span,
+          .totals-row.grand b {
+            color: #ffffff;
+          }
+
+          .conditions {
+            margin-top: 18px;
+            border-top: 1px solid #d8e2f3;
+            padding-top: 10px;
+            color: #475569;
+            font-size: 11px;
+            line-height: 1.45;
+          }
+
+          .footer {
+            position: fixed;
+            bottom: 9mm;
+            left: 12mm;
+            right: 12mm;
+            text-align: center;
+            border-top: 3px solid #0b2f73;
+            padding-top: 7px;
+            color: #475569;
+            font-size: 10.5px;
+            line-height: 1.45;
+          }
+
+          .footer b {
+            color: #0b2f73;
+          }
+
+          @media print {
+            body {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="page">
+          <div class="header">
+            <div class="brand">
+              <img src="${logo}">
+              <div>
+                <h1>${ENTREPRISE.nom}</h1>
+                <div class="subtitle">${ENTREPRISE.slogan || "Vente toutes marques"}</div>
+                <div class="company">
+                  📍 ${ENTREPRISE.adresse}<br>
+                  ☎️ ${ENTREPRISE.tel} &nbsp; | &nbsp; WhatsApp ${ENTREPRISE.whatsapp}<br>
+                  ✉️ ${ENTREPRISE.email}
+                </div>
+              </div>
+            </div>
+
+            <div class="doc-box">
+              <h2>DEVIS</h2>
+              <div class="doc-meta">
+                <div><span>N°</span><b>${d.numero || ""}</b></div>
+                <div><span>Date</span><b>${d.date || ""}</b></div>
+                <div><span>Validité</span><b>7 jours</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-card">
+              <div class="info-title">Client</div>
+              <div class="info-body">
+                <div class="line"><span>Nom</span><b>${d.clientNom || ""}</b></div>
+                <div class="line"><span>Téléphone</span><b>${d.clientTelephone || ""}</b></div>
+              </div>
+            </div>
+
+            <div class="info-card">
+              <div class="info-title">Véhicule</div>
+              <div class="info-body">
+                <div class="line"><span>Véhicule</span><b>${d.vehicule || ""}</b></div>
+                <div class="line"><span>Immat.</span><b>${d.immatriculation || ""}</b></div>
+                <div class="line"><span>VIN</span><b>${d.vin || ""}</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="details">
+            <div class="details-title">Détail du devis</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>N°</th>
+                  <th>Désignation</th>
+                  <th>Qté</th>
+                  <th>Prix HT</th>
+                  <th>Prix TTC</th>
+                  <th>Total TTC</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+
+          <div class="bottom-zone">
+            <div class="note-box">
+              <b>Observation :</b><br>
+              Les références restent internes au magasin et ne figurent pas sur le devis client.
+              Les prix sont indiqués TTC, sous réserve de disponibilité des pièces.
+            </div>
+
+            <div class="totals">
+              <div class="totals-row"><span>Total HT</span><b>${money(totalHT)}</b></div>
+              <div class="totals-row"><span>TVA 20%</span><b>${money(totalTVA)}</b></div>
+              <div class="totals-row grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div>
+            </div>
+          </div>
+
+          <div class="conditions">
+            Ce devis est établi selon les informations communiquées par le client. Il ne vaut pas réservation définitive des pièces tant que la commande n’est pas confirmée.
+          </div>
+
+          <div class="footer">
+            <b>${ENTREPRISE.nom}</b> — ${ENTREPRISE.adresse}<br>
+            Email : ${ENTREPRISE.email} — Téléphone : ${ENTREPRISE.tel} — WhatsApp : ${ENTREPRISE.whatsapp}<br>
+            TVA : ${ENTREPRISE.tvaNumber}
+          </div>
+        </div>
+
+        <script>window.print()</script>
+      </body>
+    </html>
+  `);
   w.document.close();
-}
-function printArchiveJour(a){ const rows=a.resume.map(r=>`<tr><td>${r.nom}</td><td>${r.fiches}</td><td>${r.devis}</td><td>${money(r.total)}</td></tr>`).join(""); const w=window.open("","_blank"); w.document.write(`<html><body><h1>Archive journée ${a.date}</h1><table border="1" cellpadding="8"><tr><th>Salarié</th><th>Fiches</th><th>Devis</th><th>Total</th></tr>${rows}</table><script>window.print()</script></body></html>`); w.document.close(); }
+}function printArchiveJour(a){ const rows=a.resume.map(r=>`<tr><td>${r.nom}</td><td>${r.fiches}</td><td>${r.devis}</td><td>${money(r.total)}</td></tr>`).join(""); const w=window.open("","_blank"); w.document.write(`<html><body><h1>Archive journée ${a.date}</h1><table border="1" cellpadding="8"><tr><th>Salarié</th><th>Fiches</th><th>Devis</th><th>Total</th></tr>${rows}</table><script>window.print()</script></body></html>`); w.document.close(); }
 
 createRoot(document.getElementById("root")).render(<App />);
