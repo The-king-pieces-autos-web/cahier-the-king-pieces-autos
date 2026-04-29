@@ -55,9 +55,16 @@ function uid() { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; 
 function today() {
   const d = new Date();
   const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function currentTime() {
+  const d = new Date();
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
 }
 function money(n) { return `${Number(n || 0).toFixed(2)} €`; }
 function splitPieces(txt) { return String(txt || "").split(/\n|,|;/).map(x => x.trim()).filter(Boolean); }
@@ -86,6 +93,7 @@ function emptyFiche(user, numeroAuto = "") {
     id: uid(),
     numero: numeroAuto || `FICHE-${new Date().getFullYear()}-0001`,
     date: today(),
+    heureCreation: currentTime(),
     source: "sur_place",
     statut: "en_attente",
     archiveValidee: false,
@@ -152,6 +160,7 @@ function App() {
   function newFiche() {
     const f = emptyFiche(currentUser, generateNextNumero(data.fiches));
     f.date = today();
+    f.heureCreation = currentTime();
     setEditing(f);
     setOpenPieceId("");
     setActive("edition");
@@ -267,7 +276,7 @@ function App() {
                     .slice(0, 10)
                     .map(f => (
                       <button key={f.id} onClick={()=>{setEditing(f); setOpenPieceId(f.pieces?.[0]?.id || ""); setActive("edition");}}>
-                        <span><b>{f.immatriculation || f.clientTelephone || "Demande sans plaque"}</b><small>{f.creeParNom} · {splitPieces(f.demandeRapide).slice(0,3).join(", ")}</small></span>
+                        <span><b>{f.immatriculation || f.clientTelephone || "Demande sans plaque"}</b><small>{f.creeParNom} · {f.date} {f.heureCreation || ""} · {splitPieces(f.demandeRapide).slice(0,3).join(", ")}</small></span>
                         <strong>{f.pieces?.length || splitPieces(f.demandeRapide).length} pièce(s)</strong>
                       </button>
                     ))}
@@ -286,7 +295,7 @@ function App() {
                       <div className="admin-docs">
                         {docs.slice(0, 8).map(f => (
                           <button key={f.id} onClick={()=>{setEditing(f); setOpenPieceId(f.pieces?.[0]?.id || ""); setActive("edition");}}>
-                            <b>{f.numero}</b><span>{f.date}</span><span>{f.immatriculation || "Sans plaque"}</span><span>{money(totalFiche(f))}</span>
+                            <b>{f.numero}</b><span>{f.date} {f.heureCreation || ""}</span><span>{f.immatriculation || "Sans plaque"}</span><span>{money(totalFiche(f))}</span>
                           </button>
                         ))}
                         {!docs.length && <small>Aucune fiche.</small>}
@@ -434,6 +443,7 @@ function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, c
           <div className="grid2">
             <label>Numéro fiche<input value={editing.numero} onChange={e=>setField("numero",e.target.value)}/></label>
             <label>Date<input type="date" value={editing.date} onChange={e=>setField("date",e.target.value)}/></label>
+            <label>Heure création<input value={editing.heureCreation || ""} onChange={e=>setField("heureCreation",e.target.value)} placeholder="HH:MM"/></label>
             <label>Source<select value={editing.source} onChange={e=>setField("source",e.target.value)}><option value="sur_place">Sur place</option><option value="telephone">Téléphone</option><option value="whatsapp">WhatsApp</option></select></label>
             <label>Statut<select value={editing.statut} onChange={e=>setField("statut",e.target.value)}><option value="en_attente">En attente</option><option value="en_recherche">En recherche</option><option value="termine">Archivé / validé</option></select></label>
             <label>Nom client<input value={editing.clientNom} onChange={e=>setField("clientNom",e.target.value)}/></label>
@@ -872,6 +882,10 @@ function printFiche(f) {
               <div class="info-box">
                 <label>Date</label>
                 <strong>${f.date || ""}</strong>
+              </div>
+              <div class="info-box">
+                <label>Heure</label>
+                <strong>${f.heureCreation || ""}</strong>
               </div>
               <div class="info-box">
                 <label>Salarié</label>
