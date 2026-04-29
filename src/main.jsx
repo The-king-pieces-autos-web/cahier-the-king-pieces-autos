@@ -104,6 +104,8 @@ function emptyFiche(user, numeroAuto = "") {
     vin: "",
     marque: "",
     modele: "",
+    marqueManuelle: "",
+    modeleManuel: "",
     finition: "",
     remarque: "",
     creeParId: user?.id || "",
@@ -127,6 +129,14 @@ function totalFiche(f) {
   return (f.pieces || []).reduce((sum, p) => {
     return sum + selectedProps(p).reduce((s, pr) => s + Number(pr.prix || 0), 0);
   }, 0);
+}
+
+function vehicleName(f) {
+  return [
+    f.marqueManuelle || f.marque,
+    f.modeleManuel || f.modele,
+    f.finition
+  ].filter(Boolean).join(" ");
 }
 function loadState() {
   try { const x = localStorage.getItem(LS_KEY); if (x) return JSON.parse(x); } catch {}
@@ -186,7 +196,7 @@ function App() {
       .filter(f => {
         if (!q) return true;
         const text = [
-          f.numero, f.clientNom, f.clientTelephone, f.immatriculation, f.vin, f.marque, f.modele, f.creeParNom,
+          f.numero, f.clientNom, f.clientTelephone, f.immatriculation, f.vin, f.marque, f.modele, f.marqueManuelle, f.modeleManuel, f.creeParNom,
           f.demandeRapide,
           ...(f.pieces || []).flatMap(p => [p.designation, ...((p.propositions || []).flatMap(pr => [pr.reference, pr.marque, pr.prix]))])
         ].join(" ").toLowerCase();
@@ -325,7 +335,7 @@ function App() {
                 <article className="fiche-card" key={f.id}>
                   <div className="card-top"><div><b>{f.numero}</b><small>{f.date} · {f.creeParNom}</small></div><span className={`badge ${f.archiveValidee ? "termine":""}`}>{f.archiveValidee ? "Archivé" : "À reprendre"}</span></div>
                   <h3>{f.clientNom || "Client non renseigné"}</h3>
-                  <p><Car size={16}/>{f.immatriculation || "Plaque non renseignée"} — {[f.marque, f.modele, f.finition].filter(Boolean).join(" ") || "Véhicule non renseigné"}</p>
+                  <p><Car size={16}/>{f.immatriculation || "Plaque non renseignée"} — {vehicleName(f) || "Véhicule non renseigné"}</p>
                   <p><Phone size={16}/>{f.clientTelephone || "Téléphone non renseigné"}</p>
                   <div className="mini-pieces">
                     {((f.pieces || []).length ? f.pieces : splitPieces(f.demandeRapide).map(x => ({id:x, designation:x}))).slice(0,5).map(p => <span key={p.id}>{p.designation}</span>)}
@@ -450,8 +460,10 @@ function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, c
             <label>Téléphone<input value={editing.clientTelephone} onChange={e=>setField("clientTelephone",e.target.value)}/></label>
             <label>Immatriculation<input value={editing.immatriculation} onChange={e=>setField("immatriculation",e.target.value.toUpperCase())}/></label>
             <label>VIN / châssis<input maxLength="17" value={editing.vin} onChange={e=>setField("vin",e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""))}/></label>
-            <label>Marque<select value={editing.marque} onChange={e=>setEditing({...editing, marque:e.target.value, modele:""})}><option value="">Sélectionner</option>{CAR_BRANDS.map(m=><option key={m}>{m}</option>)}</select></label>
-            <label>Modèle<select value={editing.modele} disabled={!editing.marque} onChange={e=>setField("modele",e.target.value)}><option value="">Sélectionner</option>{(CAR_MODELS[editing.marque]||[]).map(m=><option key={m}>{m}</option>)}</select></label>
+            <label>Marque automatique<select value={editing.marque} onChange={e=>setEditing({...editing, marque:e.target.value, modele:""})}><option value="">Sélectionner</option>{CAR_BRANDS.map(m=><option key={m}>{m}</option>)}</select></label>
+            <label>Modèle automatique<select value={editing.modele} disabled={!editing.marque} onChange={e=>setField("modele",e.target.value)}><option value="">Sélectionner</option>{(CAR_MODELS[editing.marque]||[]).map(m=><option key={m}>{m}</option>)}</select></label>
+            <label>Marque manuelle si absente<input value={editing.marqueManuelle || ""} onChange={e=>setField("marqueManuelle",e.target.value)} placeholder="Écrire la marque si elle n'est pas dans la liste"/></label>
+            <label>Modèle manuel si absent<input value={editing.modeleManuel || ""} onChange={e=>setField("modeleManuel",e.target.value)} placeholder="Écrire le modèle si absent"/></label>
             <label>Finition / motorisation<input value={editing.finition} onChange={e=>setField("finition",e.target.value)} placeholder="1.6 HDI, année, finition..."/></label>
           </div>
         </div>
@@ -909,7 +921,7 @@ function printFiche(f) {
               </div>
               <div class="info-box wide">
                 <label>Véhicule</label>
-                <strong>${[f.marque,f.modele,f.finition].filter(Boolean).join(" ")}</strong>
+                <strong>${vehicleName(f)}</strong>
               </div>
             </div>
           </div>
