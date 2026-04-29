@@ -395,7 +395,7 @@ function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, c
       ...editing,
       pieces:(editing.pieces||[]).map(p=>{
         if(p.id!==pieceId) return p;
-        const props = [...(p.propositions || [propositionEmpty(1), propositionEmpty(2)])];
+        const props = [...(p.propositions || [])];
         props[idx] = {...(props[idx] || propositionEmpty(idx+1)), ...patch};
         return {...p, propositions:props};
       })
@@ -406,11 +406,41 @@ function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, c
       ...editing,
       pieces:(editing.pieces||[]).map(p=>{
         if(p.id!==pieceId) return p;
-        const props = (p.propositions || [propositionEmpty(1), propositionEmpty(2)]).map((pr,i)=>(
+        const props = (p.propositions || []).map((pr,i)=>(
           i === idx ? {...pr, selectionnee: checked, retenue: checked} : pr
         ));
         return {...p, propositions:props};
       })
+    });
+  }
+
+  function addProposition(pieceId) {
+    setEditing({
+      ...editing,
+      pieces: (editing.pieces || []).map((p) => {
+        if (p.id !== pieceId) return p;
+        const current = p.propositions || [];
+        return { ...p, propositions: [...current, propositionEmpty(current.length + 1)] };
+      }),
+    });
+  }
+
+  function removeProposition(pieceId, idx) {
+    setEditing({
+      ...editing,
+      pieces: (editing.pieces || []).map((p) => {
+        if (p.id !== pieceId) return p;
+        const current = p.propositions || [];
+        if (current.length <= 1) {
+          alert("Il faut garder au minimum une proposition.");
+          return p;
+        }
+        const next = current.filter((_, i) => i !== idx).map((pr, i) => ({ ...pr, numero: i + 1 }));
+        if (!next.some((pr) => pr.selectionnee || pr.retenue)) {
+          next[0] = { ...next[0], selectionnee: true, retenue: true };
+        }
+        return { ...p, propositions: next };
+      }),
     });
   }
   function imageToBase64(file,pieceId){
@@ -499,12 +529,23 @@ function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, c
                 <label>Remarque<input value={pieceOuverte.remarque || ""} onChange={e=>updatePiece(pieceOuverte.id,{remarque:e.target.value})}/></label>
               </div>
 
+              <div className="line-title proposition-toolbar">
+                <div>
+                  <h4>Propositions</h4>
+                  <small>Tu peux garder une seule proposition, supprimer la deuxième, ou ajouter une 3e, 4e, etc.</small>
+                </div>
+                <button onClick={()=>addProposition(pieceOuverte.id)}><Plus/>Ajouter une proposition</button>
+              </div>
+
               <div className="two-proposals">
-                {(pieceOuverte.propositions || [propositionEmpty(1), propositionEmpty(2)]).slice(0,2).map((pr,idx)=>(
+                {(pieceOuverte.propositions || [propositionEmpty(1)]).map((pr,idx)=>(
                   <div className={`simple-proposal ${(pr.selectionnee || pr.retenue) ? "selected-proposal":""}`} key={pr.id || idx}>
                     <div className="proposal-head">
                       <b>Proposition {idx+1}</b>
-                      <label className="radio-choice"><input type="checkbox" checked={!!(pr.selectionnee || pr.retenue)} onChange={(e)=>togglePropSelection(pieceOuverte.id,idx,e.target.checked)}/>Afficher</label>
+                      <div className="proposal-head-actions">
+                        <label className="radio-choice"><input type="checkbox" checked={!!(pr.selectionnee || pr.retenue)} onChange={(e)=>togglePropSelection(pieceOuverte.id,idx,e.target.checked)}/>Afficher</label>
+                        {(pieceOuverte.propositions || []).length > 1 && <button className="danger" onClick={()=>removeProposition(pieceOuverte.id, idx)}><Trash2/>Supprimer</button>}
+                      </div>
                     </div>
                     <div className="grid2">
                       <label>Référence proposition {idx+1}<input value={pr.reference || ""} onChange={e=>updateProp(pieceOuverte.id,idx,{reference:e.target.value})}/></label>
@@ -539,6 +580,8 @@ function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, c
 function printFiche(f) {
   const pieces = (f.pieces || []).length ? f.pieces : splitPieces(f.demandeRapide).map(n => emptyPiece(n));
 
+  const maxProps = Math.max(1, ...pieces.map((p) => (p.propositions || []).length));
+
   function rowsForProposal(index) {
     return pieces.map((p, i) => {
       const prop = (p.propositions || [])[index] || {};
@@ -551,14 +594,51 @@ function printFiche(f) {
         <td>${prop.marque || ""}</td>
         <td>${prop.note || ""}</td>
         <td class="price-cell">${money(prop.prix)}</td>
-        <td class="select-cell">${selected ? "Oui" : "Non"}</td>
+        <td class="select-cell">${prop.reference || prop.prix || prop.marque ? (selected ? "Oui" : "Non") : "—"}</td>
       </tr>`;
     }).join("");
   }
 
-  const total1 = totalProposition(f, 0);
-  const total2 = totalProposition(f, 1);
-  const grandTotal = total1 + total2;
+  function totalByProposal(index) {
+    return pieces.reduce((sum, p) => {
+      const prop = (p.propositions || [])[index] || {};
+      return (prop.selectionnee || prop.retenue) ? sum + Number(prop.prix || 0) : sum;
+    }, 0);
+  }
+
+  const totals = Array.from({ length: maxProps }, (_, i) => totalByProposal(i));
+  const grandTotal = totals.reduce((a, b) => a + b, 0);
+
+  const propositionTables = Array.from({ length: maxProps }, (_, i) => `
+    <div class="section">
+      <div class="section-head">
+        <h3>Proposition ${i + 1}</h3>
+        <div class="section-total">Total : ${money(totals[i])}</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>N°</th>
+            <th>Pièce</th>
+            <th>Référence</th>
+            <th>Image</th>
+            <th>Marque / fournisseur</th>
+            <th>Note</th>
+            <th>Prix</th>
+            <th>Sélection</th>
+          </tr>
+        </thead>
+        <tbody>${rowsForProposal(i)}</tbody>
+      </table>
+    </div>
+  `).join("");
+
+  const summaryCards = totals.map((t, i) => `
+    <div class="summary-card">
+      <label>Total proposition ${i + 1}</label>
+      <strong>${money(t)}</strong>
+    </div>
+  `).join("");
 
   const win = window.open("", "_blank");
   win.document.write(`
@@ -568,432 +648,81 @@ function printFiche(f) {
         <style>
           @page { size: A4; margin: 10mm; }
           * { box-sizing: border-box; }
-          body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            color: #111827;
-            background: #ffffff;
-            font-size: 12px;
-          }
-
-          .page {
-            width: 100%;
-            min-height: 100%;
-            border: 1px solid #d9e1f2;
-            border-radius: 14px;
-            overflow: hidden;
-          }
-
-          .top {
-            display: grid;
-            grid-template-columns: 1.2fr .8fr;
-            gap: 18px;
-            padding: 16px 18px;
-            background: linear-gradient(135deg, #071b4b, #12347c);
-            color: white;
-          }
-
-          .brand {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-          }
-
-          .brand img {
-            width: 76px;
-            height: 76px;
-            object-fit: contain;
-            background: white;
-            border-radius: 16px;
-            padding: 6px;
-          }
-
-          .brand h1 {
-            margin: 0;
-            font-size: 25px;
-            letter-spacing: .5px;
-          }
-
-          .brand p {
-            margin: 5px 0 0;
-            color: #e7ecff;
-            font-size: 13px;
-            font-weight: 700;
-          }
-
-          .contact {
-            text-align: right;
-            line-height: 1.6;
-            font-size: 12px;
-            color: #f7f9ff;
-          }
-
-          .title-bar {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            align-items: center;
-            padding: 13px 18px;
-            border-bottom: 3px solid #d4a21c;
-            background: #f7f9ff;
-          }
-
-          .title-bar h2 {
-            margin: 0;
-            color: #071b4b;
-            font-size: 19px;
-          }
-
-          .status-pill {
-            background: #fff3cd;
-            border: 1px solid #d4a21c;
-            color: #5a4300;
-            border-radius: 999px;
-            padding: 7px 11px;
-            font-size: 12px;
-            font-weight: 800;
-          }
-
-          .main-info {
-            padding: 14px 18px 8px;
-          }
-
-          .info-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 9px;
-          }
-
-          .info-box {
-            border: 1px solid #d9e1f2;
-            border-radius: 12px;
-            padding: 9px 10px;
-            background: #ffffff;
-            min-height: 54px;
-          }
-
-          .info-box label {
-            display: block;
-            color: #667085;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: .4px;
-            margin-bottom: 4px;
-            font-weight: 800;
-          }
-
-          .info-box strong {
-            color: #071b4b;
-            font-size: 13px;
-            line-height: 1.3;
-            font-weight: 800;
-            word-break: break-word;
-          }
-
-          .info-box.wide {
-            grid-column: span 2;
-          }
-
-          .note {
-            margin: 12px 18px;
-            padding: 10px 12px;
-            background: #fff9e8;
-            border: 1px solid #edd17a;
-            border-radius: 12px;
-            color: #4f3a00;
-            font-weight: 700;
-          }
-
-          .section {
-            padding: 8px 18px 0;
-          }
-
-          .section-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin: 10px 0 7px;
-          }
-
-          .section-head h3 {
-            margin: 0;
-            color: #071b4b;
-            font-size: 16px;
-          }
-
-          .section-total {
-            background: #071b4b;
-            color: white;
-            border-radius: 10px;
-            padding: 7px 10px;
-            font-size: 13px;
-            font-weight: 900;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            overflow: hidden;
-            border: 1px solid #d9e1f2;
-            border-radius: 12px;
-            font-size: 11px;
-          }
-
-          th {
-            background: #071b4b;
-            color: white;
-            padding: 8px 7px;
-            text-align: left;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: .3px;
-          }
-
-          td {
-            border-top: 1px solid #e5eaf5;
-            padding: 7px;
-            vertical-align: middle;
-          }
-
-          .selected-row {
-            background: #f3fff7;
-          }
-
-          .not-selected-row {
-            background: #f4f5f7;
-            color: #747b87;
-          }
-
-          .col-num {
-            width: 32px;
-            text-align: center;
-            font-weight: 900;
-            color: #071b4b;
-          }
-
-          .piece-name {
-            font-weight: 900;
-            color: #071b4b;
-          }
-
-          .ref-cell {
-            font-weight: 800;
-          }
-
-          .price-cell {
-            font-weight: 900;
-            color: #000;
-            white-space: nowrap;
-          }
-
-          .select-cell {
-            font-weight: 900;
-            text-align: center;
-          }
-
-          .image-cell {
-            width: 86px;
-            text-align: center;
-          }
-
-          .ref-img {
-            width: 74px;
-            height: 54px;
-            object-fit: cover;
-            border: 1px solid #d9e1f2;
-            border-radius: 9px;
-            background: white;
-          }
-
-          .no-img {
-            color: #98a2b3;
-            font-weight: 800;
-          }
-
-          .summary {
-            margin: 14px 18px 16px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-          }
-
-          .summary-card {
-            border-radius: 14px;
-            padding: 12px;
-            text-align: center;
-            border: 1px solid #d9e1f2;
-            background: #f7f9ff;
-          }
-
-          .summary-card label {
-            display: block;
-            color: #667085;
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-          }
-
-          .summary-card strong {
-            color: #071b4b;
-            font-size: 18px;
-            font-weight: 900;
-          }
-
-          .summary-card.grand {
-            background: #071b4b;
-            border-color: #071b4b;
-          }
-
-          .summary-card.grand label,
-          .summary-card.grand strong {
-            color: white;
-          }
-
-          .footer {
-            margin: 0 18px 10px;
-            padding-top: 8px;
-            border-top: 1px solid #d4a21c;
-            text-align: center;
-            color: #667085;
-            font-size: 11px;
-            font-weight: 700;
-          }
-
-          @media print {
-            .page { border-radius: 0; }
-          }
+          body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111827; background: #ffffff; font-size: 12px; }
+          .page { width: 100%; min-height: 100%; border: 1px solid #d9e1f2; border-radius: 14px; overflow: hidden; }
+          .top { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; padding: 16px 18px; background: linear-gradient(135deg, #071b4b, #12347c); color: white; }
+          .brand { display: flex; align-items: center; gap: 14px; }
+          .brand img { width: 76px; height: 76px; object-fit: contain; background: white; border-radius: 16px; padding: 6px; }
+          .brand h1 { margin: 0; font-size: 25px; letter-spacing: .5px; }
+          .brand p { margin: 5px 0 0; color: #e7ecff; font-size: 13px; font-weight: 700; }
+          .contact { text-align: right; line-height: 1.6; font-size: 12px; color: #f7f9ff; }
+          .title-bar { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 13px 18px; border-bottom: 3px solid #d4a21c; background: #f7f9ff; }
+          .title-bar h2 { margin: 0; color: #071b4b; font-size: 19px; }
+          .status-pill { background: #fff3cd; border: 1px solid #d4a21c; color: #5a4300; border-radius: 999px; padding: 7px 11px; font-size: 12px; font-weight: 800; }
+          .main-info { padding: 14px 18px 8px; }
+          .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+          .info-box { border: 1px solid #d9e1f2; border-radius: 12px; padding: 9px 10px; background: #ffffff; min-height: 54px; }
+          .info-box label { display: block; color: #667085; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; font-weight: 800; }
+          .info-box strong { color: #071b4b; font-size: 13px; line-height: 1.3; font-weight: 800; word-break: break-word; }
+          .info-box.wide { grid-column: span 2; }
+          .note { margin: 12px 18px; padding: 10px 12px; background: #fff9e8; border: 1px solid #edd17a; border-radius: 12px; color: #4f3a00; font-weight: 700; }
+          .section { padding: 8px 18px 0; page-break-inside: avoid; }
+          .section-head { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 7px; }
+          .section-head h3 { margin: 0; color: #071b4b; font-size: 16px; }
+          .section-total { background: #071b4b; color: white; border-radius: 10px; padding: 7px 10px; font-size: 13px; font-weight: 900; }
+          table { width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid #d9e1f2; border-radius: 12px; font-size: 11px; }
+          th { background: #071b4b; color: white; padding: 8px 7px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; }
+          td { border-top: 1px solid #e5eaf5; padding: 7px; vertical-align: middle; }
+          .selected-row { background: #f3fff7; }
+          .not-selected-row { background: #f4f5f7; color: #747b87; }
+          .col-num { width: 32px; text-align: center; font-weight: 900; color: #071b4b; }
+          .piece-name { font-weight: 900; color: #071b4b; }
+          .ref-cell { font-weight: 800; }
+          .price-cell { font-weight: 900; color: #000; white-space: nowrap; }
+          .select-cell { font-weight: 900; text-align: center; }
+          .image-cell { width: 86px; text-align: center; }
+          .ref-img { width: 74px; height: 54px; object-fit: cover; border: 1px solid #d9e1f2; border-radius: 9px; background: white; }
+          .no-img { color: #98a2b3; font-weight: 800; }
+          .summary { margin: 14px 18px 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+          .summary-card { border-radius: 14px; padding: 12px; text-align: center; border: 1px solid #d9e1f2; background: #f7f9ff; }
+          .summary-card label { display: block; color: #667085; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 5px; }
+          .summary-card strong { color: #071b4b; font-size: 18px; font-weight: 900; }
+          .summary-card.grand { background: #071b4b; border-color: #071b4b; }
+          .summary-card.grand label, .summary-card.grand strong { color: white; }
+          .footer { margin: 0 18px 10px; padding-top: 8px; border-top: 1px solid #d4a21c; text-align: center; color: #667085; font-size: 11px; font-weight: 700; }
+          @media print { .page { border-radius: 0; } }
         </style>
       </head>
-
       <body>
         <div class="page">
           <div class="top">
-            <div class="brand">
-              <img src="${logo}">
-              <div>
-                <h1>${ENTREPRISE.nom}</h1>
-                <p>Fiche technique interne — Archive magasin</p>
-              </div>
-            </div>
-            <div class="contact">
-              📞 ${ENTREPRISE.telFixe}<br>
-              🟢 ${ENTREPRISE.whatsapp}<br>
-              ✉️ ${ENTREPRISE.email}<br>
-              📍 ${ENTREPRISE.adresse}
-            </div>
+            <div class="brand"><img src="${logo}"><div><h1>${ENTREPRISE.nom}</h1><p>Fiche technique interne — Archive magasin</p></div></div>
+            <div class="contact">📞 ${ENTREPRISE.telFixe}<br>🟢 ${ENTREPRISE.whatsapp}<br>✉️ ${ENTREPRISE.email}<br>📍 ${ENTREPRISE.adresse}</div>
           </div>
-
           <div class="title-bar">
             <h2>Fiche de recherche pièces — ${f.numero}</h2>
             <div class="status-pill">${f.archiveValidee ? "Archivé" : "Non archivé"}</div>
           </div>
-
           <div class="main-info">
             <div class="info-grid">
-              <div class="info-box">
-                <label>Date</label>
-                <strong>${f.date || ""}</strong>
-              </div>
-              <div class="info-box">
-                <label>Heure</label>
-                <strong>${f.heureCreation || ""}</strong>
-              </div>
-              <div class="info-box">
-                <label>Salarié</label>
-                <strong>${f.creeParNom || ""}</strong>
-              </div>
-              <div class="info-box">
-                <label>Client</label>
-                <strong>${f.clientNom || ""}</strong>
-              </div>
-              <div class="info-box">
-                <label>Téléphone</label>
-                <strong>${f.clientTelephone || ""}</strong>
-              </div>
-              <div class="info-box">
-                <label>Immatriculation</label>
-                <strong>${f.immatriculation || ""}</strong>
-              </div>
-              <div class="info-box">
-                <label>VIN / Châssis</label>
-                <strong>${f.vin || ""}</strong>
-              </div>
-              <div class="info-box wide">
-                <label>Véhicule</label>
-                <strong>${vehicleName(f)}</strong>
-              </div>
+              <div class="info-box"><label>Date</label><strong>${f.date || ""}</strong></div>
+              <div class="info-box"><label>Heure</label><strong>${f.heureCreation || ""}</strong></div>
+              <div class="info-box"><label>Salarié</label><strong>${f.creeParNom || ""}</strong></div>
+              <div class="info-box"><label>Client</label><strong>${f.clientNom || ""}</strong></div>
+              <div class="info-box"><label>Téléphone</label><strong>${f.clientTelephone || ""}</strong></div>
+              <div class="info-box"><label>Immatriculation</label><strong>${f.immatriculation || ""}</strong></div>
+              <div class="info-box"><label>VIN / Châssis</label><strong>${f.vin || ""}</strong></div>
+              <div class="info-box wide"><label>Véhicule</label><strong>${vehicleName(f)}</strong></div>
             </div>
           </div>
-
-          <div class="note">
-            Document interne pour archive magasin. Ce document n’est pas un devis client.
-          </div>
-
-          <div class="section">
-            <div class="section-head">
-              <h3>Proposition 1</h3>
-              <div class="section-total">Total : ${money(total1)}</div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>N°</th>
-                  <th>Pièce</th>
-                  <th>Référence</th>
-                  <th>Image</th>
-                  <th>Marque / fournisseur</th>
-                  <th>Note</th>
-                  <th>Prix</th>
-                  <th>Sélection</th>
-                </tr>
-              </thead>
-              <tbody>${rowsForProposal(0)}</tbody>
-            </table>
-          </div>
-
-          <div class="section">
-            <div class="section-head">
-              <h3>Proposition 2</h3>
-              <div class="section-total">Total : ${money(total2)}</div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>N°</th>
-                  <th>Pièce</th>
-                  <th>Référence</th>
-                  <th>Image</th>
-                  <th>Marque / fournisseur</th>
-                  <th>Note</th>
-                  <th>Prix</th>
-                  <th>Sélection</th>
-                </tr>
-              </thead>
-              <tbody>${rowsForProposal(1)}</tbody>
-            </table>
-          </div>
-
+          <div class="note">Document interne pour archive magasin. Ce document n’est pas un devis client.</div>
+          ${propositionTables}
           <div class="summary">
-            <div class="summary-card">
-              <label>Total proposition 1</label>
-              <strong>${money(total1)}</strong>
-            </div>
-            <div class="summary-card">
-              <label>Total proposition 2</label>
-              <strong>${money(total2)}</strong>
-            </div>
-            <div class="summary-card grand">
-              <label>Total sélectionné</label>
-              <strong>${money(grandTotal)}</strong>
-            </div>
+            ${summaryCards}
+            <div class="summary-card grand"><label>Total sélectionné</label><strong>${money(grandTotal)}</strong></div>
           </div>
-
-          <div class="footer">
-            ${ENTREPRISE.nom} — ${ENTREPRISE.adresse} — ${ENTREPRISE.email}
-          </div>
+          <div class="footer">${ENTREPRISE.nom} — ${ENTREPRISE.adresse} — ${ENTREPRISE.email}</div>
         </div>
-
         <script>window.print()</script>
       </body>
     </html>

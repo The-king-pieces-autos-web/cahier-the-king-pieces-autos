@@ -38,3 +38,15 @@ main{padding:28px}.hero{min-height:280px;background-size:cover;background-positi
   border-radius: 14px;
   border: 1px solid var(--line);
 }
+
+.proposition-toolbar {
+  margin-top: 16px;
+}
+.proposal-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.two-proposals {
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+}
