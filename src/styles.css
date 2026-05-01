@@ -367,3 +367,34 @@ nav{display:grid;gap:10px}nav button{justify-content:flex-start;background:rgba(
 }
 
 .share-note{color:var(--muted);font-size:12px;font-weight:700}
+
+.devis-stats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+  margin:0 0 14px;
+}
+.devis-stats div{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:14px;
+  display:grid;
+  gap:4px;
+  box-shadow:0 10px 24px rgba(8,27,75,.06);
+}
+.devis-stats b{
+  color:var(--blue);
+  font-size:26px;
+}
+.devis-stats span{
+  color:var(--muted);
+  font-weight:800;
+}
+.archive-badge{
+  background:#eef3ff !important;
+  color:#12347c !important;
+}
+@media(max-width:900px){
+  .devis-stats{grid-template-columns:1fr}
+}

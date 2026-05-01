@@ -298,7 +298,7 @@ function App(){
   const visibleDevis = useMemo(()=>{
     const q=search.trim().toLowerCase();
     return data.devis
-      .filter(d=>q || d.date===today())
+      // Tous les devis restent visibles dans la partie Devis, même après clôture / sauvegarde journalière.
       .filter(d=>currentUser?.role==="admin" || d.creeParId===currentUser?.id)
       .filter(d=>!q || [d.numero,d.clientNom,d.clientTelephone,d.immatriculation,d.vin,d.vehicule,...(d.lignes||[]).map(l=>l.designation)].join(" ").toLowerCase().includes(q));
   },[data.devis,search,currentUser]);
@@ -332,7 +332,14 @@ function App(){
 
       {active==="edition"&&editing&&<Editor editing={editing} setEditing={setEditing} openPieceId={openPieceId} setOpenPieceId={setOpenPieceId} saveFiche={saveFiche} sendToDevis={sendToDevis} setPreview={setPreview} cancel={()=>setActive("cahier")}/>}
 
-      {active==="devis"&&<section><Header title="Devis" subtitle="Devis client imprimable, sans références internes et sans remise."/><div className="toolbar single"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom..."/></div></div><div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className="badge realise">Devis client</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger</button><button onClick={()=>envoyerDevisWhatsApp(d)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
+      {active==="devis"&&<section><Header title="Devis" subtitle="Tous les devis restent ici : devis du jour, anciens devis et devis archivés après clôture journalière."/><div className="toolbar single"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom..."/></div></div>
+            <div className="devis-stats">
+              <div><b>{data.devis.filter(d=>isSameDay(d.date)).length}</b><span>Devis du jour</span></div>
+              <div><b>{data.devis.length}</b><span>Total devis conservés</span></div>
+              <div><b>{data.devis.filter(d=>d.archiveJourId).length}</b><span>Devis archivés</span></div>
+            </div>
+            <div className="info-banner">Les devis clôturés restent visibles ici. La sauvegarde journalière crée seulement un dossier de sécurité.</div>
+            <div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className={`badge realise ${d.archiveJourId ? "archive-badge" : ""}`}>{d.archiveJourId ? "Archivé" : "Devis client"}</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger</button><button onClick={()=>envoyerDevisWhatsApp(d)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
                   <button onClick={()=>setEditingDevis(JSON.parse(JSON.stringify(d)))}><Edit3/>Modifier</button>
                   <button className="danger" onClick={()=>deleteDevisClient(d.id)}><Trash2/>Supprimer</button></article>)}</div></section>}
 
