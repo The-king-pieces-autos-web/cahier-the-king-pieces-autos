@@ -332,7 +332,7 @@ function App(){
 
       {active==="edition"&&editing&&<Editor editing={editing} setEditing={setEditing} openPieceId={openPieceId} setOpenPieceId={setOpenPieceId} saveFiche={saveFiche} sendToDevis={sendToDevis} setPreview={setPreview} cancel={()=>setActive("cahier")}/>}
 
-      {active==="devis"&&<section><Header title="Devis" subtitle="Devis client imprimable, sans références internes et sans remise."/><div className="toolbar single"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom..."/></div></div><div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className="badge realise">Devis client</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button>
+      {active==="devis"&&<section><Header title="Devis" subtitle="Devis client imprimable, sans références internes et sans remise."/><div className="toolbar single"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recherche plaque, VIN, nom..."/></div></div><div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className="badge realise">Devis client</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger</button><button onClick={()=>envoyerDevisWhatsApp(d)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
                   <button onClick={()=>setEditingDevis(JSON.parse(JSON.stringify(d)))}><Edit3/>Modifier</button>
                   <button className="danger" onClick={()=>deleteDevisClient(d.id)}><Trash2/>Supprimer</button></article>)}</div></section>}
 
@@ -534,7 +534,7 @@ function ArchiveModal({archive, close}){
                 </table>
 
                 <div className="actions">
-                  <button onClick={() => printDevisClient(d)}><Printer/>Imprimer ce devis</button>
+                  <button onClick={() => printDevisClient(d)}><Printer/>Imprimer ce devis</button><button onClick={() => telechargerDevisHtml(d)}><FileText/>Télécharger</button><button onClick={() => envoyerDevisWhatsApp(d)}><Send/>WhatsApp</button><button onClick={() => envoyerDevisEmail(d)}><Send/>Email</button>
                 </div>
               </div>
             ))}
@@ -639,12 +639,117 @@ function DevisEditModal({devis, setDevis, save, close}){
 
         <div className="preview-actions-pro">
           <button onClick={close}><X/>Annuler</button>
-          <button onClick={()=>printDevisClient(devis)}><Printer/>Aperçu impression</button>
+          <button onClick={()=>printDevisClient(devis)}><Printer/>Aperçu impression</button><button onClick={()=>telechargerDevisHtml(devis)}><FileText/>Télécharger</button><button onClick={()=>envoyerDevisWhatsApp(devis)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(devis)}><Send/>Email</button>
           <button className="primary" onClick={()=>save(devis)}><Save/>Enregistrer modification</button>
         </div>
       </div>
     </div>
   );
+}
+
+
+function cleanPhoneForWhatsApp(phone=""){
+  let n = String(phone || "").replace(/[^\d+]/g, "");
+  if (!n) return "";
+  if (n.startsWith("+")) return n.replace("+", "");
+  if (n.startsWith("00")) return n.slice(2);
+  if (n.startsWith("0")) return "33" + n.slice(1);
+  return n;
+}
+
+function devisMessageClient(d){
+  const total = money(totalDevis(d));
+  const lignes = (d.lignes || [])
+    .map((l) => `- ${l.designation || ""} x${l.quantite || 1} : ${money(Number(l.quantite || 1) * Number(l.prixTTC || 0))}`)
+    .join("\\n");
+
+  return `Bonjour,
+
+Voici votre devis ${d.numero || ""} :
+
+Client : ${d.clientNom || ""}
+Véhicule : ${d.vehicule || ""}
+Immatriculation : ${d.immatriculation || ""}
+
+${lignes}
+
+Total TTC : ${total}
+
+Cordialement,
+${ENTREPRISE.nom}
+Téléphone : ${ENTREPRISE.tel}
+WhatsApp : ${ENTREPRISE.whatsapp}
+Adresse : ${ENTREPRISE.adresse}`;
+}
+
+function envoyerDevisWhatsApp(d){
+  const phone = cleanPhoneForWhatsApp(d.clientTelephone || "");
+  const message = devisMessageClient(d);
+  const url = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank");
+}
+
+function envoyerDevisEmail(d){
+  const subject = `Devis ${d.numero || ""} - ${ENTREPRISE.nom}`;
+  const body = devisMessageClient(d);
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function telechargerDevisHtml(d){
+  const totalTTC = totalDevis(d);
+  const totalHT = htFromTtc(totalTTC);
+  const totalTVA = tvaFromTtc(totalTTC);
+  const rows = (d.lignes || []).map((l, i) => {
+    const unitTTC = Number(l.prixTTC || 0);
+    const qty = Number(l.quantite || 1);
+    const unitHT = htFromTtc(unitTTC);
+    const lineTTC = qty * unitTTC;
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${l.designation || ""}</td>
+      <td>${qty}</td>
+      <td>${money(unitHT)}</td>
+      <td>${money(unitTTC)}</td>
+      <td>${money(lineTTC)}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>${d.numero || "devis"}</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;color:#111827;margin:30px}
+.header{display:flex;justify-content:space-between;border-bottom:4px solid #0b2f73;padding-bottom:14px}
+h1,h2{color:#0b2f73;margin:0}.company{font-size:12px;line-height:1.5;margin-top:8px}
+.boxes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.box{border:1px solid #c7d7ef;border-radius:12px;padding:12px}
+table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px}th{background:#0b2f73;color:white;text-align:left;padding:9px}td{border:1px solid #d8e2f3;padding:8px}
+.totals{margin-top:20px;margin-left:auto;width:320px;border:1px solid #c7d7ef;border-radius:12px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #d8e2f3;font-weight:800}.grand{background:#000;color:#fff;font-size:18px}
+.footer{margin-top:40px;border-top:3px solid #0b2f73;padding-top:8px;text-align:center;font-size:11px;color:#475569}
+</style></head>
+<body>
+<div class="header">
+  <div><h1>${ENTREPRISE.nom}</h1><div class="company">📍 ${ENTREPRISE.adresse}<br>☎️ ${ENTREPRISE.tel} — WhatsApp ${ENTREPRISE.whatsapp}<br>✉️ ${ENTREPRISE.email}</div></div>
+  <div style="text-align:right"><h2>DEVIS</h2><b>N° ${d.numero || ""}</b><br><b>Date : ${d.date || ""}</b></div>
+</div>
+<div class="boxes">
+  <div class="box"><b>Client</b><br>${d.clientNom || ""}<br>${d.clientTelephone || ""}</div>
+  <div class="box"><b>Véhicule</b><br>${d.vehicule || ""}<br>Plaque : ${d.immatriculation || ""}<br>VIN : ${d.vin || ""}</div>
+</div>
+<table><thead><tr><th>N°</th><th>Désignation</th><th>Qté</th><th>Prix HT</th><th>Prix TTC</th><th>Total TTC</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="totals"><div><span>Total HT</span><b>${money(totalHT)}</b></div><div><span>TVA 20%</span><b>${money(totalTVA)}</b></div><div class="grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div></div>
+<div class="footer">${ENTREPRISE.nom} — ${ENTREPRISE.adresse}<br>${ENTREPRISE.email} — ${ENTREPRISE.tel} — TVA : ${ENTREPRISE.tvaNumber || ""}</div>
+</body></html>`;
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(d.numero || "devis").replace(/[^a-zA-Z0-9-_]/g, "_")}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function printDevisClient(d){

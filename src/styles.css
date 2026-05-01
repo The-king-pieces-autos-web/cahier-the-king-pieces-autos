@@ -365,3 +365,5 @@ nav{display:grid;gap:10px}nav button{justify-content:flex-start;background:rgba(
   color:#5a4300 !important;
   border:1px solid #ead391 !important;
 }
+
+.share-note{color:var(--muted);font-size:12px;font-weight:700}
