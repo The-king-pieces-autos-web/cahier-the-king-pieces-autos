@@ -398,3 +398,39 @@ nav{display:grid;gap:10px}nav button{justify-content:flex-start;background:rgba(
 @media(max-width:900px){
   .devis-stats{grid-template-columns:1fr}
 }
+
+.archive-day-list{
+  display:grid;
+  gap:22px;
+}
+.archive-day-block{
+  background:rgba(255,255,255,.62);
+  border:1px solid var(--line);
+  border-radius:24px;
+  padding:16px;
+}
+.archive-day-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--line);
+}
+.archive-day-head h3{
+  margin:0;
+  color:var(--blue);
+  font-size:22px;
+}
+.archive-day-head span{
+  background:#fff8df;
+  color:#5a4300;
+  border:1px solid #ead391;
+  border-radius:999px;
+  padding:8px 12px;
+  font-weight:900;
+}
+@media(max-width:900px){
+  .archive-day-head{display:grid}
+}
