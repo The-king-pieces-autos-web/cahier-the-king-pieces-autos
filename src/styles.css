@@ -333,7 +333,7 @@ nav{display:grid;gap:10px}nav button{justify-content:flex-start;background:rgba(
 }
 .devis-edit-row{
   display:grid;
-  grid-template-columns:1.6fr .45fr .65fr .65fr auto;
+  grid-template-columns:1.4fr .35fr .55fr .8fr .8fr .55fr auto;
   gap:8px;
   align-items:center;
   background:#f8fbff;

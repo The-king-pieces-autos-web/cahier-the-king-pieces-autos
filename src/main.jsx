@@ -81,7 +81,7 @@ function emptyFiche(user, fiches=[]){
 function linesFromFiche(f){
   return (f.pieces||[]).flatMap(p=>selectedProps(p).map(pr=>({
     id: `${p.id}-${pr.id}`, designation: p.designation, quantite: Number(p.quantite||1),
-    prixTTC: Number(pr.prix||0), note: pr.note || ""
+    prixTTC: Number(pr.prix||0), note: pr.note || "", disponibilite: pr.disponibilite || "", disponibleQuand: pr.disponibleQuand || ""
   })));
 }
 function emptyDevisFromFiche(f, devis=[]){
@@ -89,7 +89,7 @@ function emptyDevisFromFiche(f, devis=[]){
     id: uid(), ficheId: f.id, numero: nextNumber(devis,"DEV"), date: today(), heureCreation: nowTime(),
     clientNom: f.clientNom, clientTelephone: f.clientTelephone, immatriculation: f.immatriculation,
     vin: f.vin, vehicule: vehicleName(f), creeParId: f.creeParId, creeParNom: f.creeParNom,
-    lignes: linesFromFiche(f), remarque: f.remarque || ""
+    lignes: linesFromFiche(f), remarque: f.remarque || "", source: f.source || "sur_place"
   };
 }
 function totalDevis(d){ return (d.lignes||[]).reduce((s,l)=>s+Number(l.quantite||1)*Number(l.prixTTC||0),0); }
@@ -451,7 +451,7 @@ function App(){
               <div><b>{data.devis.filter(d=>d.archiveJourId).length}</b><span>Devis archivés</span></div>
             </div>
             <div className="info-banner">Les devis clôturés restent visibles ici. La sauvegarde journalière crée seulement un dossier de sécurité.</div>
-            <div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom}</small></div><span className={`badge realise ${d.archiveJourId ? "archive-badge" : ""}`}>{d.archiveJourId ? "Archivé" : "Devis client"}</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger</button><button onClick={()=>envoyerDevisWhatsApp(d)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
+            <div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom} · {sourceLabel(d.source)}</small></div><span className={`badge realise ${d.archiveJourId ? "archive-badge" : ""}`}>{d.archiveJourId ? "Archivé" : "Devis client"}</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger</button><button onClick={()=>envoyerDevisWhatsApp(d)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
                   <button onClick={()=>setEditingDevis(JSON.parse(JSON.stringify(d)))}><Edit3/>Modifier</button>
                   <button className="danger" onClick={()=>deleteDevisClient(d.id)}><Trash2/>Supprimer</button></article>)}</div></section>}
 
@@ -496,7 +496,9 @@ function Editor({ editing, setEditing, openPieceId, setOpenPieceId, saveFiche, s
   function removeProp(pid,idx){ setEditing({...editing,pieces:(editing.pieces||[]).map(p=>{if(p.id!==pid)return p;if((p.propositions||[]).length<=1){alert("Minimum une proposition.");return p;}return {...p,propositions:p.propositions.filter((_,i)=>i!==idx).map((pr,i)=>({...pr,numero:i+1}))};})}); }
   function imageProp(file,pid,idx){ const r=new FileReader(); r.onload=()=>updateProp(pid,idx,{image:r.result}); r.readAsDataURL(file); }
   function prepare(){ const names=splitPieces(editing.demandeRapide); if(!names.length)return alert("Écris la liste de pièces."); const ex=(editing.pieces||[]).map(p=>p.designation.toLowerCase()); const newP=names.filter(n=>!ex.includes(n.toLowerCase())).map(n=>emptyPiece(n)); const pieces=[...(editing.pieces||[]),...newP]; setEditing({...editing,pieces,statut:"en_cours"}); setOpenPieceId(pieces[0]?.id||""); }
-  return <section><Header title="Cahier salarié — recherche" subtitle="Mise en attente sous la demande rapide, puis recherche et envoi vers devis."/><div className="editor"><div className="panel"><h3>Informations client / véhicule</h3><div className="grid2"><label>Numéro<input value={editing.numero} onChange={e=>setField("numero",e.target.value)}/></label><label>Date<input type="date" value={editing.date} onChange={e=>setField("date",e.target.value)}/></label><label>Heure<input value={editing.heureCreation||""} onChange={e=>setField("heureCreation",e.target.value)}/></label><label>Statut<select value={editing.statut} onChange={e=>setField("statut",e.target.value)}><option value="en_attente">En attente</option><option value="en_cours">En cours</option><option value="realise">Réalisé</option></select></label><label>Nom client<input value={editing.clientNom} onChange={e=>setField("clientNom",e.target.value)}/></label><label>Téléphone<input value={editing.clientTelephone} onChange={e=>setField("clientTelephone",e.target.value)}/></label><label>Immatriculation<input value={editing.immatriculation} onChange={e=>setField("immatriculation",e.target.value.toUpperCase())}/></label><label>VIN<input maxLength="17" value={editing.vin} onChange={e=>setField("vin",e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""))}/></label><label>Marque automatique<select value={editing.marque} onChange={e=>setEditing({...editing,marque:e.target.value,modele:""})}><option value="">Sélectionner</option>{CAR_BRANDS.map(m=><option key={m}>{m}</option>)}</select></label><label>Modèle automatique<select value={editing.modele} disabled={!editing.marque} onChange={e=>setField("modele",e.target.value)}><option value="">Sélectionner</option>{(CAR_MODELS[editing.marque]||[]).map(m=><option key={m}>{m}</option>)}</select></label><label>Marque manuelle<input value={editing.marqueManuelle||""} onChange={e=>setField("marqueManuelle",e.target.value)}/></label><label>Modèle manuel<input value={editing.modeleManuel||""} onChange={e=>setField("modeleManuel",e.target.value)}/></label><label>Finition / motorisation<input value={editing.finition} onChange={e=>setField("finition",e.target.value)}/></label></div></div><div className="panel demande-client"><div className="line-title"><div><h3>Demande rapide</h3><p className="muted">Liste donnée par le client, une pièce par ligne.</p></div><button onClick={prepare}><ClipboardList/>Commencer la recherche</button></div><textarea className="big-request" value={editing.demandeRapide} onChange={e=>setField("demandeRapide",e.target.value)} placeholder={"Kit embrayage\nKit distribution\nFiltre à air\nFiltre à huile"}/><div className="quick-actions"><button className="primary" onClick={()=>saveFiche({...editing,statut:"en_attente"})}><Clock/>Mettre en attente</button><button onClick={()=>setField("demandeRapide","")}><X/>Vider</button></div></div><div className="panel"><div className="line-title"><h3>Recherche détaillée</h3><button onClick={()=>{const p=emptyPiece("");setEditing({...editing,pieces:[...(editing.pieces||[]),p],statut:"en_cours"});setOpenPieceId(p.id)}}><Plus/>Ajouter pièce</button></div><div className="request-preview">{(editing.pieces||[]).map((p,i)=><button key={p.id} className={openPieceId===p.id?"tab-on":""} onClick={()=>setOpenPieceId(p.id)}>{i+1}. {p.designation||"Pièce sans nom"}</button>)}</div>{!piece?<div className="waiting-panel">Clique sur “Commencer la recherche”.</div>:<div className="piece-box"><div className="piece-head"><b>{piece.designation}</b><button className="danger" onClick={()=>{const rest=editing.pieces.filter(p=>p.id!==piece.id);setEditing({...editing,pieces:rest});setOpenPieceId(rest[0]?.id||"")}}><Trash2/></button></div><div className="grid2"><label>Nom pièce<input value={piece.designation} onChange={e=>updatePiece(piece.id,{designation:e.target.value})}/></label><label>Quantité<input type="number" value={piece.quantite||1} onChange={e=>updatePiece(piece.id,{quantite:e.target.value})}/></label></div><div className="line-title proposition-toolbar"><div><h4>Propositions</h4><small>Prix saisi en TTC. Les références ne sortent pas sur le devis client.</small></div><button onClick={()=>addProp(piece.id)}><Plus/>Ajouter proposition</button></div><div className="two-proposals">{(piece.propositions||[]).map((pr,idx)=><div className={`simple-proposal ${pr.selectionnee?"selected-proposal":""}`} key={pr.id}><div className="proposal-head"><b>Proposition {idx+1}</b><div className="proposal-head-actions"><label className="radio-choice"><input type="checkbox" checked={!!pr.selectionnee} onChange={e=>toggleProp(piece.id,idx,e.target.checked)}/>Sélectionner</label>{(piece.propositions||[]).length>1&&<button className="danger" onClick={()=>removeProp(piece.id,idx)}><Trash2/>Supprimer</button>}</div></div><div className="grid2"><label>Référence<input value={pr.reference||""} onChange={e=>updateProp(piece.id,idx,{reference:e.target.value})}/></label><label>Marque / fournisseur<input value={pr.marque||""} onChange={e=>updateProp(piece.id,idx,{marque:e.target.value})}/></label><label>Prix TTC<input type="number" value={pr.prix||""} onChange={e=>updateProp(piece.id,idx,{prix:e.target.value})}/></label><label>Note<input value={pr.note||""} onChange={e=>updateProp(piece.id,idx,{note:e.target.value})}/></label></div><div className="image-line proposition-image-line">{pr.image?<img src={pr.image}/>:<div className="empty-img"><ImagePlus/>Image réf.</div>}<label className="upload"><ImagePlus/>Ajouter image<input type="file" accept="image/*" onChange={e=>e.target.files?.[0]&&imageProp(e.target.files[0],piece.id,idx)}/></label>{pr.image&&<button className="danger" onClick={()=>updateProp(piece.id,idx,{image:""})}><Trash2/>Retirer</button>}</div></div>)}</div></div>}</div><div className="bottom-actions"><button onClick={cancel}><X/>Retour</button><button onClick={()=>setPreview(editing)}><Eye/>Consultation détaillée du devis</button><button className="primary" onClick={()=>saveFiche({...editing,statut: isRechercheTerminee(editing) ? "realise" : "en_cours"})}><Save/>Enregistrer dans le cahier</button><button onClick={()=>sendToDevis({...editing,statut:"realise"})}><Send/>Envoyer vers devis</button></div></div></section>;
+  return <section><Header title="Cahier salarié — recherche" subtitle="Mise en attente sous la demande rapide, puis recherche et envoi vers devis."/><div className="editor"><div className="panel"><h3>Informations client / véhicule</h3><div className="grid2"><label>Numéro<input value={editing.numero} onChange={e=>setField("numero",e.target.value)}/></label><label>Date<input type="date" value={editing.date} onChange={e=>setField("date",e.target.value)}/></label><label>Heure<input value={editing.heureCreation||""} onChange={e=>setField("heureCreation",e.target.value)}/></label><label>Statut<select value={editing.statut} onChange={e=>setField("statut",e.target.value)}><option value="en_attente">En attente</option><option value="en_cours">En cours</option><option value="realise">Réalisé</option></select></label><label>Nom client<input value={editing.clientNom} onChange={e=>setField("clientNom",e.target.value)}/></label><label>Téléphone<input value={editing.clientTelephone} onChange={e=>setField("clientTelephone",e.target.value)}/></label><label>Immatriculation<input value={editing.immatriculation} onChange={e=>setField("immatriculation",e.target.value.toUpperCase())}/></label><label>VIN<input maxLength="17" value={editing.vin} onChange={e=>setField("vin",e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""))}/></label><label>Marque automatique<select value={editing.marque} onChange={e=>setEditing({...editing,marque:e.target.value,modele:""})}><option value="">Sélectionner</option>{CAR_BRANDS.map(m=><option key={m}>{m}</option>)}</select></label><label>Modèle automatique<select value={editing.modele} disabled={!editing.marque} onChange={e=>setField("modele",e.target.value)}><option value="">Sélectionner</option>{(CAR_MODELS[editing.marque]||[]).map(m=><option key={m}>{m}</option>)}</select></label><label>Marque manuelle<input value={editing.marqueManuelle||""} onChange={e=>setField("marqueManuelle",e.target.value)}/></label><label>Modèle manuel<input value={editing.modeleManuel||""} onChange={e=>setField("modeleManuel",e.target.value)}/></label><label>Finition / motorisation<input value={editing.finition} onChange={e=>setField("finition",e.target.value)}/></label></div></div><div className="panel demande-client"><div className="line-title"><div><h3>Demande rapide</h3><p className="muted">Liste donnée par le client, une pièce par ligne.</p></div><button onClick={prepare}><ClipboardList/>Commencer la recherche</button></div><textarea className="big-request" value={editing.demandeRapide} onChange={e=>setField("demandeRapide",e.target.value)} placeholder={"Kit embrayage\nKit distribution\nFiltre à air\nFiltre à huile"}/><div className="quick-actions"><button className="primary" onClick={()=>saveFiche({...editing,statut:"en_attente"})}><Clock/>Mettre en attente</button><button onClick={()=>setField("demandeRapide","")}><X/>Vider</button></div></div><div className="panel"><div className="line-title"><h3>Recherche détaillée</h3><button onClick={()=>{const p=emptyPiece("");setEditing({...editing,pieces:[...(editing.pieces||[]),p],statut:"en_cours"});setOpenPieceId(p.id)}}><Plus/>Ajouter pièce</button></div><div className="request-preview">{(editing.pieces||[]).map((p,i)=><button key={p.id} className={openPieceId===p.id?"tab-on":""} onClick={()=>setOpenPieceId(p.id)}>{i+1}. {p.designation||"Pièce sans nom"}</button>)}</div>{!piece?<div className="waiting-panel">Clique sur “Commencer la recherche”.</div>:<div className="piece-box"><div className="piece-head"><b>{piece.designation}</b><button className="danger" onClick={()=>{const rest=editing.pieces.filter(p=>p.id!==piece.id);setEditing({...editing,pieces:rest});setOpenPieceId(rest[0]?.id||"")}}><Trash2/></button></div><div className="grid2"><label>Nom pièce<input value={piece.designation} onChange={e=>updatePiece(piece.id,{designation:e.target.value})}/></label><label>Quantité<input type="number" value={piece.quantite||1} onChange={e=>updatePiece(piece.id,{quantite:e.target.value})}/></label></div><div className="line-title proposition-toolbar"><div><h4>Propositions</h4><small>Prix saisi en TTC. Les références ne sortent pas sur le devis client.</small></div><button onClick={()=>addProp(piece.id)}><Plus/>Ajouter proposition</button></div><div className="two-proposals">{(piece.propositions||[]).map((pr,idx)=><div className={`simple-proposal ${pr.selectionnee?"selected-proposal":""}`} key={pr.id}><div className="proposal-head"><b>Proposition {idx+1}</b><div className="proposal-head-actions"><label className="radio-choice"><input type="checkbox" checked={!!pr.selectionnee} onChange={e=>toggleProp(piece.id,idx,e.target.checked)}/>Sélectionner</label>{(piece.propositions||[]).length>1&&<button className="danger" onClick={()=>removeProp(piece.id,idx)}><Trash2/>Supprimer</button>}</div></div><div className="grid2"><label>Référence<input value={pr.reference||""} onChange={e=>updateProp(piece.id,idx,{reference:e.target.value})}/></label><label>Marque / fournisseur<input value={pr.marque||""} onChange={e=>updateProp(piece.id,idx,{marque:e.target.value})}/></label><label>Prix TTC<input type="number" value={pr.prix||""} onChange={e=>updateProp(piece.id,idx,{prix:e.target.value})}/></label><label>Note<input value={pr.note||""} onChange={e=>updateProp(piece.id,idx,{note:e.target.value})}/></label>
+<label>Disponibilité<select value={pr.disponibilite||""} onChange={e=>updateProp(piece.id,idx,{disponibilite:e.target.value})}><option value="">Non renseignée</option><option value="Disponible">Disponible</option><option value="Indisponible">Indisponible</option><option value="Sur commande">Sur commande</option></select></label>
+<label>Disponible pour quand<input value={pr.disponibleQuand||""} onChange={e=>updateProp(piece.id,idx,{disponibleQuand:e.target.value})} placeholder="Ex : aujourd'hui, demain, 48h..."/></label></div><div className="image-line proposition-image-line">{pr.image?<img src={pr.image}/>:<div className="empty-img"><ImagePlus/>Image réf.</div>}<label className="upload"><ImagePlus/>Ajouter image<input type="file" accept="image/*" onChange={e=>e.target.files?.[0]&&imageProp(e.target.files[0],piece.id,idx)}/></label>{pr.image&&<button className="danger" onClick={()=>updateProp(piece.id,idx,{image:""})}><Trash2/>Retirer</button>}</div></div>)}</div></div>}</div><div className="bottom-actions"><button onClick={cancel}><X/>Retour</button><button onClick={()=>setPreview(editing)}><Eye/>Consultation détaillée du devis</button><button className="primary" onClick={()=>saveFiche({...editing,statut: isRechercheTerminee(editing) ? "realise" : "en_cours"})}><Save/>Enregistrer dans le cahier</button><button onClick={()=>sendToDevis({...editing,statut:"realise"})}><Send/>Envoyer vers devis</button></div></div></section>;
 }
 
 function PreviewModal({fiche, close, send}){
@@ -640,7 +642,7 @@ function ArchiveModal({archive, close}){
                       <th>Désignation</th>
                       <th>Qté</th>
                       <th>Prix TTC</th>
-                      <th>Total TTC</th>
+                      <th>Disponibilité</th><th>Total TTC</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -717,7 +719,7 @@ function DevisEditModal({devis, setDevis, save, close}){
     setDevis({...devis, lignes:(devis.lignes||[]).filter((l)=>l.id!==id)});
   }
   function addLine(){
-    setDevis({...devis, lignes:[...(devis.lignes||[]), {id:uid(), designation:"", quantite:1, prixTTC:0}]});
+    setDevis({...devis, lignes:[...(devis.lignes||[]), {id:uid(), designation:"", quantite:1, prixTTC:0, disponibilite:"", disponibleQuand:""}]});
   }
 
   return (
@@ -738,6 +740,7 @@ function DevisEditModal({devis, setDevis, save, close}){
           <label>Téléphone<input value={devis.clientTelephone || ""} onChange={(e)=>setDevis({...devis, clientTelephone:e.target.value})}/></label>
           <label>Immatriculation<input value={devis.immatriculation || ""} onChange={(e)=>setDevis({...devis, immatriculation:e.target.value.toUpperCase()})}/></label>
           <label>Véhicule<input value={devis.vehicule || ""} onChange={(e)=>setDevis({...devis, vehicule:e.target.value})}/></label>
+          <label>Origine demande<select value={devis.source || "sur_place"} onChange={(e)=>setDevis({...devis, source:e.target.value})}><option value="sur_place">Sur place</option><option value="telephone">Téléphone</option><option value="whatsapp">WhatsApp</option></select></label>
         </div>
 
         <div className="line-title devis-edit-title">
@@ -751,6 +754,8 @@ function DevisEditModal({devis, setDevis, save, close}){
               <input placeholder="Désignation" value={l.designation || ""} onChange={(e)=>updateLine(l.id,{designation:e.target.value})}/>
               <input type="number" placeholder="Qté" value={l.quantite || 1} onChange={(e)=>updateLine(l.id,{quantite:Number(e.target.value || 1)})}/>
               <input type="number" placeholder="Prix TTC" value={l.prixTTC || ""} onChange={(e)=>updateLine(l.id,{prixTTC:Number(e.target.value || 0)})}/>
+              <select value={l.disponibilite || ""} onChange={(e)=>updateLine(l.id,{disponibilite:e.target.value})}><option value="">Disponibilité</option><option value="Disponible">Disponible</option><option value="Indisponible">Indisponible</option><option value="Sur commande">Sur commande</option></select>
+              <input placeholder="Disponible quand" value={l.disponibleQuand || ""} onChange={(e)=>updateLine(l.id,{disponibleQuand:e.target.value})}/>
               <b>{money(Number(l.quantite || 1)*Number(l.prixTTC || 0))}</b>
               <button className="danger" onClick={()=>removeLine(l.id)}><Trash2/></button>
             </div>
@@ -779,25 +784,40 @@ function cleanPhoneForWhatsApp(phone=""){
   return n;
 }
 
+function sourceLabel(source){
+  if(source === "telephone") return "Téléphone";
+  if(source === "whatsapp") return "WhatsApp";
+  return "Sur place";
+}
+
+function formatDisponibilite(l){
+  const dispo = l.disponibilite || "Disponibilité non renseignée";
+  const quand = l.disponibleQuand ? ` - disponible : ${l.disponibleQuand}` : "";
+  return `${dispo}${quand}`;
+}
+
 function devisMessageClient(d){
   const total = money(totalDevis(d));
   const lignes = (d.lignes || [])
-    .map((l) => `- ${l.designation || ""} x${l.quantite || 1} : ${money(Number(l.quantite || 1) * Number(l.prixTTC || 0))}`)
-    .join("\\n");
+    .map((l) => `• ${l.designation || ""} : ${money(Number(l.quantite || 1) * Number(l.prixTTC || 0))} TTC
+  Disponibilité : ${formatDisponibilite(l)}`)
+    .join("\n\n");
 
-  return `Bonjour,
+  return `Bonjour ${d.clientNom || ""},
 
-Voici votre devis ${d.numero || ""} :
+Voici votre devis ${d.numero || ""}.
 
 Client : ${d.clientNom || ""}
+Plaque : ${d.immatriculation || ""}
 Véhicule : ${d.vehicule || ""}
-Immatriculation : ${d.immatriculation || ""}
+Demande reçue : ${sourceLabel(d.source)}
 
 ${lignes}
 
 Total TTC : ${total}
 
-Cordialement,
+Merci pour votre confiance.
+
 ${ENTREPRISE.nom}
 Téléphone : ${ENTREPRISE.tel}
 WhatsApp : ${ENTREPRISE.whatsapp}
@@ -834,6 +854,7 @@ function telechargerDevisHtml(d){
       <td>${qty}</td>
       <td>${money(unitHT)}</td>
       <td>${money(unitTTC)}</td>
+      <td>${formatDisponibilite(l)}</td>
       <td>${money(lineTTC)}</td>
     </tr>`;
   }).join("");
@@ -858,7 +879,7 @@ table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px}th{back
   <div class="box"><b>Client</b><br>${d.clientNom || ""}<br>${d.clientTelephone || ""}</div>
   <div class="box"><b>Véhicule</b><br>${d.vehicule || ""}<br>Plaque : ${d.immatriculation || ""}<br>VIN : ${d.vin || ""}</div>
 </div>
-<table><thead><tr><th>N°</th><th>Désignation</th><th>Qté</th><th>Prix HT</th><th>Prix TTC</th><th>Total TTC</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>N°</th><th>Désignation</th><th>Qté</th><th>Prix HT</th><th>Prix TTC</th><th>Disponibilité</th><th>Total TTC</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="totals"><div><span>Total HT</span><b>${money(totalHT)}</b></div><div><span>TVA 20%</span><b>${money(totalTVA)}</b></div><div class="grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div></div>
 <div class="footer">${ENTREPRISE.nom} — ${ENTREPRISE.adresse}<br>${ENTREPRISE.email} — ${ENTREPRISE.tel} — TVA : ${ENTREPRISE.tvaNumber || ""}</div>
 </body></html>`;
@@ -889,7 +910,7 @@ function printDevisClient(d){
         <td class="qty">${qty}</td>
         <td class="price">${money(unitHT)}</td>
         <td class="price">${money(unitTTC)}</td>
-        <td class="price total-line">${money(lineTTC)}</td>
+        <td>${formatDisponibilite(l)}</td><td class="price total-line">${money(lineTTC)}</td>
       </tr>
     `;
   }).join("");
