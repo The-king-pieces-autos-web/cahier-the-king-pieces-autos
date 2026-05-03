@@ -7,6 +7,7 @@ import {
   Trash2, Users, X
 } from "lucide-react";
 import "./styles.css";
+import html2canvas from "html2canvas";
 import logo from "./assets/logo.png";
 import hero from "./assets/dashboard-hero.jpeg";
 import { hasSupabaseConfig, loadCloudState, saveCloudState, subscribeCloudState, supabase } from "./lib/supabase";
@@ -451,7 +452,7 @@ function App(){
               <div><b>{data.devis.filter(d=>d.archiveJourId).length}</b><span>Devis archivés</span></div>
             </div>
             <div className="info-banner">Les devis clôturés restent visibles ici. La sauvegarde journalière crée seulement un dossier de sécurité.</div>
-            <div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom} · {sourceLabel(d.source)}</small></div><span className={`badge realise ${d.archiveJourId ? "archive-badge" : ""}`}>{d.archiveJourId ? "Archivé" : "Devis client"}</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger</button><button onClick={()=>envoyerDevisWhatsApp(d)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
+            <div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom} · {sourceLabel(d.source)}</small></div><span className={`badge realise ${d.archiveJourId ? "archive-badge" : ""}`}>{d.archiveJourId ? "Archivé" : "Devis client"}</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger HTML</button><button onClick={()=>telechargerDevisImage(d)}><FileText/>Télécharger image</button><button onClick={()=>envoyerDevisImageWhatsApp(d)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
                   <button onClick={()=>setEditingDevis(JSON.parse(JSON.stringify(d)))}><Edit3/>Modifier</button>
                   <button className="danger" onClick={()=>deleteDevisClient(d.id)}><Trash2/>Supprimer</button></article>)}</div></section>}
 
@@ -675,7 +676,7 @@ function ArchiveModal({archive, close}){
                 </table>
 
                 <div className="actions">
-                  <button onClick={() => printDevisClient(d)}><Printer/>Imprimer ce devis</button><button onClick={() => telechargerDevisHtml(d)}><FileText/>Télécharger</button><button onClick={() => envoyerDevisWhatsApp(d)}><Send/>WhatsApp</button><button onClick={() => envoyerDevisEmail(d)}><Send/>Email</button>
+                  <button onClick={() => printDevisClient(d)}><Printer/>Imprimer ce devis</button><button onClick={() => telechargerDevisHtml(d)}><FileText/>Télécharger HTML</button><button onClick={() => telechargerDevisImage(d)}><FileText/>Télécharger image</button><button onClick={() => envoyerDevisImageWhatsApp(d)}><Send/>WhatsApp</button><button onClick={() => envoyerDevisEmail(d)}><Send/>Email</button>
                 </div>
               </div>
             ))}
@@ -783,7 +784,7 @@ function DevisEditModal({devis, setDevis, save, close}){
 
         <div className="preview-actions-pro">
           <button onClick={close}><X/>Annuler</button>
-          <button onClick={()=>printDevisClient(devis)}><Printer/>Aperçu impression</button><button onClick={()=>telechargerDevisHtml(devis)}><FileText/>Télécharger</button><button onClick={()=>envoyerDevisWhatsApp(devis)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(devis)}><Send/>Email</button>
+          <button onClick={()=>printDevisClient(devis)}><Printer/>Aperçu impression</button><button onClick={()=>telechargerDevisHtml(devis)}><FileText/>Télécharger HTML</button><button onClick={()=>telechargerDevisImage(devis)}><FileText/>Télécharger image</button><button onClick={()=>envoyerDevisImageWhatsApp(devis)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(devis)}><Send/>Email</button>
           <button className="primary" onClick={()=>save(devis)}><Save/>Enregistrer modification</button>
         </div>
       </div>
@@ -814,57 +815,36 @@ function formatDisponibilite(l){
 }
 
 function devisMessageClient(d){
-  const totalTTC = totalDevis(d);
-  const totalHT = htFromTtc(totalTTC);
-  const totalTVA = tvaFromTtc(totalTTC);
+  const total = totalDevis(d);
 
   const lignes = (d.lignes || [])
-    .map((l, index) => {
+    .map((l) => {
       const qty = Number(l.quantite || 1);
-      const unitTTC = Number(l.prixTTC || 0);
-      const lineTTC = qty * unitTTC;
-      return `${index + 1}. ${l.designation || ""}
-   Quantité : ${qty}
-   Prix TTC : ${money(unitTTC)}
-   Total TTC : ${money(lineTTC)}
-   Disponibilité : ${formatDisponibilite(l)}`;
+      const unit = Number(l.prixTTC || 0);
+      const lineTotal = qty * unit;
+
+      return `• ${l.designation || ""}
+  Qté : ${qty}
+  Prix : ${money(lineTotal)}
+  Disponibilité : ${formatDisponibilite(l)}`;
     })
     .join("\n\n");
 
   return `Bonjour ${d.clientNom || ""},
 
-━━━━━━━━━━━━━━━━━━━━
-DEVIS ${d.numero || ""}
-${ENTREPRISE.nom}
-━━━━━━━━━━━━━━━━━━━━
+Voici les éléments concernant votre demande :
 
-CLIENT
-Nom : ${d.clientNom || ""}
-Téléphone : ${d.clientTelephone || ""}
+🚗 Véhicule
+${d.vehicule || "Non renseigné"}
+Plaque : ${d.immatriculation || "Non renseignée"}
 
-VÉHICULE
-Plaque : ${d.immatriculation || ""}
-Modèle : ${d.vehicule || ""}
-Origine demande : ${sourceLabel(d.source)}
+🧩 Pièces
 
-DÉTAIL DES PIÈCES
-${lignes || "Aucune ligne renseignée"}
+${lignes || "Aucune pièce renseignée"}
 
-RÉCAPITULATIF
-Total HT : ${money(totalHT)}
-TVA 20% : ${money(totalTVA)}
-TOTAL TTC : ${money(totalTTC)}
+💰 Total : ${money(total)}
 
-Merci pour votre confiance.
-
-${ENTREPRISE.nom}
-📍 ${ENTREPRISE.adresse}
-📞 ${ENTREPRISE.tel}
-WhatsApp : ${ENTREPRISE.whatsapp}`;
-}
-
-function envoyerDevisWhatsApp(d){
-  ouvrirDevisWhatsAppModele(d);
+Merci pour votre retour.`;
 }
 
 function envoyerDevisEmail(d){
@@ -873,6 +853,103 @@ function envoyerDevisEmail(d){
   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
+
+function buildDevisImageElement(d){
+  const totalTTC = totalDevis(d);
+  const totalHT = htFromTtc(totalTTC);
+  const totalTVA = tvaFromTtc(totalTTC);
+
+  const page = document.createElement("div");
+  page.className = "devis-image-export";
+  page.innerHTML = `
+    <div class="die-header">
+      <div class="die-brand">
+        <div class="die-logo">${ENTREPRISE.nom.split(" ").map(w=>w[0]).join("").slice(0,4)}</div>
+        <div>
+          <h1>${ENTREPRISE.nom}</h1>
+          <p>${ENTREPRISE.slogan || "Vente toutes marques"}</p>
+          <small>📍 ${ENTREPRISE.adresse}<br>📞 ${ENTREPRISE.tel} · WhatsApp ${ENTREPRISE.whatsapp}<br>✉️ ${ENTREPRISE.email}</small>
+        </div>
+      </div>
+      <div class="die-title">
+        <h2>DEVIS</h2>
+        <b>${d.numero || ""}</b>
+        <span>${d.date || ""}</span>
+      </div>
+    </div>
+
+    <div class="die-info">
+      <div><h3>Client</h3><p><b>Nom :</b> ${d.clientNom || ""}</p><p><b>Téléphone :</b> ${d.clientTelephone || ""}</p></div>
+      <div><h3>Véhicule</h3><p><b>Modèle :</b> ${d.vehicule || ""}</p><p><b>Plaque :</b> ${d.immatriculation || ""}</p><p><b>VIN :</b> ${d.vin || ""}</p></div>
+    </div>
+
+    <table class="die-table">
+      <thead>
+        <tr><th>N°</th><th>Image / désignation</th><th>Qté</th><th>Prix TTC</th><th>Total TTC</th></tr>
+      </thead>
+      <tbody>
+        ${(d.lignes || []).map((l, i) => {
+          const img = l.image ? `<img src="${l.image}">` : `<div class="die-no-img">Image</div>`;
+          const qty = Number(l.quantite || 1);
+          const unit = Number(l.prixTTC || 0);
+          return `<tr>
+            <td>${i + 1}</td>
+            <td><div class="die-line">${img}<div><b>${l.designation || ""}</b><small>${formatDisponibilite(l)}</small></div></div></td>
+            <td>${qty}</td>
+            <td>${money(unit)}</td>
+            <td><b>${money(qty * unit)}</b></td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+
+    <div class="die-bottom">
+      <div class="die-note">Les références restent internes au magasin. Prix TTC sous réserve de disponibilité.</div>
+      <div class="die-totals">
+        <div><span>Total HT</span><b>${money(totalHT)}</b></div>
+        <div><span>TVA 20%</span><b>${money(totalTVA)}</b></div>
+        <div class="grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div>
+      </div>
+    </div>
+
+    <div class="die-footer">Merci pour votre confiance — ${ENTREPRISE.nom}</div>
+  `;
+  return page;
+}
+
+async function telechargerDevisImage(d){
+  const node = buildDevisImageElement(d);
+  document.body.appendChild(node);
+
+  try {
+    const canvas = await html2canvas(node, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+      allowTaint: true
+    });
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 1));
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(d.numero || "devis").replace(/[^a-zA-Z0-9-_]/g, "_")}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } finally {
+    document.body.removeChild(node);
+  }
+}
+
+async function envoyerDevisImageWhatsApp(d){
+  await telechargerDevisImage(d);
+  const phone = cleanPhoneForWhatsApp(d.clientTelephone || "");
+  const text = devisMessageClient(d);
+  const url = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, "_blank");
+}
 function buildDevisHtml(d, autoPrint=false){
   const totalTTC = totalDevis(d);
   const totalHT = htFromTtc(totalTTC);
@@ -1016,12 +1093,10 @@ function ouvrirDevisWhatsAppModele(d){
   window.open(url, "_blank");
 
   const phone = cleanPhoneForWhatsApp(d.clientTelephone || "");
-  const text = `Bonjour ${d.clientNom || ""}, voici votre devis ${d.numero || ""} de ${ENTREPRISE.nom}. Je vous envoie le devis au format visuel avec les images des pièces. Merci pour votre confiance.`;
+  const text = devisMessageClient(d);
   const wa = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
   window.open(wa, "_blank");
 }
-
-
 function printDevisClient(d){
   const w = window.open("", "_blank");
   w.document.write(buildDevisHtml(d, true));
