@@ -680,3 +680,23 @@ nav{display:grid;gap:10px}nav button{justify-content:flex-start;background:rgba(
   color:#0b2f73;
   font-weight:900;
 }
+
+.validation-panel{
+  margin:0 0 16px;
+}
+.validation-buttons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:10px;
+}
+.validation-buttons button{
+  border:1px solid var(--line);
+  background:#f8fbff;
+  color:var(--blue);
+}
+.validation-buttons button.active-validation{
+  background:#0b2f73;
+  color:#fff;
+  border-color:#0b2f73;
+}

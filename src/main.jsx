@@ -255,6 +255,7 @@ function App(){
   const [archiveOpen, setArchiveOpen] = useState(null);
   const [editingDevis, setEditingDevis] = useState(null);
   const [userForm, setUserForm] = useState({ nom:"", identifiant:"", motDePasse:"", role:"salarie" });
+  const [validationOptions, setValidationOptions] = useState({ matin:false, apresMidi:false, fournisseur1420:false, fournisseur17:false });
   const [syncStatus, setSyncStatus] = useState(hasSupabaseConfig ? "Connexion Supabase..." : "Mode local");
   const lastSaveRef = useRef(0);
 
@@ -452,7 +453,8 @@ function App(){
               <div><b>{data.devis.filter(d=>d.archiveJourId).length}</b><span>Devis archivés</span></div>
             </div>
             <div className="info-banner">Les devis clôturés restent visibles ici. La sauvegarde journalière crée seulement un dossier de sécurité.</div>
-            <div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom} · {sourceLabel(d.source)}</small></div><span className={`badge realise ${d.archiveJourId ? "archive-badge" : ""}`}>{d.archiveJourId ? "Archivé" : "Devis client"}</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger HTML</button><button onClick={()=>telechargerDevisImage(d)}><FileText/>Télécharger image</button><button onClick={()=>envoyerDevisImageWhatsApp(d)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
+            <div className="panel validation-panel"><h3>Options à ajouter au message WhatsApp</h3><p className="muted">Clique sur les horaires que tu veux envoyer au client avant d’appuyer sur WhatsApp.</p>{buildValidationButtons(validationOptions, setValidationOptions)}</div>
+            <div className="cards">{visibleDevis.map(d=><article className="fiche-card" key={d.id}><div className="card-top"><div><b>{d.numero}</b><small>{d.date} {d.heureCreation} · {d.creeParNom} · {sourceLabel(d.source)}</small></div><span className={`badge realise ${d.archiveJourId ? "archive-badge" : ""}`}>{d.archiveJourId ? "Archivé" : "Devis client"}</span></div><h3>{d.clientNom||"Client non renseigné"}</h3><p><Car size={16}/>{d.immatriculation||"Sans plaque"} — {d.vehicule}</p><div className="mini-pieces">{(d.lignes||[]).slice(0,5).map(l=><span key={l.id}>{l.designation} · {money(l.prixTTC)}</span>)}</div><button onClick={()=>printDevisClient(d)}><Printer/>Imprimer devis</button><button onClick={()=>telechargerDevisHtml(d)}><FileText/>Télécharger HTML</button><button onClick={()=>telechargerDevisImage(d)}><FileText/>Télécharger image</button><button onClick={()=>envoyerDevisImageWhatsApp(d, validationOptions)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(d)}><Send/>Email</button>
                   <button onClick={()=>setEditingDevis(JSON.parse(JSON.stringify(d)))}><Edit3/>Modifier</button>
                   <button className="danger" onClick={()=>deleteDevisClient(d.id)}><Trash2/>Supprimer</button></article>)}</div></section>}
 
@@ -676,7 +678,7 @@ function ArchiveModal({archive, close}){
                 </table>
 
                 <div className="actions">
-                  <button onClick={() => printDevisClient(d)}><Printer/>Imprimer ce devis</button><button onClick={() => telechargerDevisHtml(d)}><FileText/>Télécharger HTML</button><button onClick={() => telechargerDevisImage(d)}><FileText/>Télécharger image</button><button onClick={() => envoyerDevisImageWhatsApp(d)}><Send/>WhatsApp</button><button onClick={() => envoyerDevisEmail(d)}><Send/>Email</button>
+                  <button onClick={() => printDevisClient(d)}><Printer/>Imprimer ce devis</button><button onClick={() => telechargerDevisHtml(d)}><FileText/>Télécharger HTML</button><button onClick={() => telechargerDevisImage(d)}><FileText/>Télécharger image</button><button onClick={() => envoyerDevisImageWhatsApp(d, validationOptions)}><Send/>WhatsApp</button><button onClick={() => envoyerDevisEmail(d)}><Send/>Email</button>
                 </div>
               </div>
             ))}
@@ -784,7 +786,7 @@ function DevisEditModal({devis, setDevis, save, close}){
 
         <div className="preview-actions-pro">
           <button onClick={close}><X/>Annuler</button>
-          <button onClick={()=>printDevisClient(devis)}><Printer/>Aperçu impression</button><button onClick={()=>telechargerDevisHtml(devis)}><FileText/>Télécharger HTML</button><button onClick={()=>telechargerDevisImage(devis)}><FileText/>Télécharger image</button><button onClick={()=>envoyerDevisImageWhatsApp(devis)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(devis)}><Send/>Email</button>
+          <button onClick={()=>printDevisClient(devis)}><Printer/>Aperçu impression</button><button onClick={()=>telechargerDevisHtml(devis)}><FileText/>Télécharger HTML</button><button onClick={()=>telechargerDevisImage(devis)}><FileText/>Télécharger image</button><button onClick={()=>envoyerDevisImageWhatsApp(devis, validationOptions)}><Send/>WhatsApp</button><button onClick={()=>envoyerDevisEmail(devis)}><Send/>Email</button>
           <button className="primary" onClick={()=>save(devis)}><Save/>Enregistrer modification</button>
         </div>
       </div>
@@ -814,37 +816,58 @@ function formatDisponibilite(l){
   return `${dispo}${quand}`;
 }
 
-function devisMessageClient(d){
+
+function validationOptionsText(options = {}){
+  const lignes = [];
+  if(options.matin) lignes.push("Validation avant 11h30 (matin)");
+  if(options.apresMidi) lignes.push("Validation avant 15h30 (après-midi)");
+  if(options.fournisseur1420) lignes.push("Validation avant 14h20 (fournisseur)");
+  if(options.fournisseur17) lignes.push("Validation avant 17h00 (fournisseur)");
+  return lignes;
+}
+
+function buildValidationButtons(options, setOptions){
+  return (
+    <div className="validation-buttons">
+      <button className={options.matin ? "active-validation" : ""} onClick={()=>setOptions(prev=>({...prev, matin: !prev.matin}))}>Matin 11h30</button>
+      <button className={options.apresMidi ? "active-validation" : ""} onClick={()=>setOptions(prev=>({...prev, apresMidi: !prev.apresMidi}))}>Après-midi 15h30</button>
+      <button className={options.fournisseur1420 ? "active-validation" : ""} onClick={()=>setOptions(prev=>({...prev, fournisseur1420: !prev.fournisseur1420}))}>Fournisseur 14h20</button>
+      <button className={options.fournisseur17 ? "active-validation" : ""} onClick={()=>setOptions(prev=>({...prev, fournisseur17: !prev.fournisseur17}))}>Fournisseur 17h</button>
+    </div>
+  );
+}
+
+function devisMessageClient(d, options = {}){
   const total = totalDevis(d);
 
   const lignes = (d.lignes || [])
     .map((l) => {
-      const qty = Number(l.quantite || 1);
       const unit = Number(l.prixTTC || 0);
-      const lineTotal = qty * unit;
-
       return `• ${l.designation || ""}
-  Qté : ${qty}
-  Prix : ${money(lineTotal)}
+  Prix : ${money(unit)}
   Disponibilité : ${formatDisponibilite(l)}`;
     })
     .join("\n\n");
 
+  const validations = validationOptionsText(options);
+  const blocValidation = validations.length
+    ? `\n\nConditions de validation :\n${validations.join("\n")}`
+    : "";
+
   return `Bonjour ${d.clientNom || ""},
 
-Voici les éléments concernant votre demande :
+Voici les éléments concernant votre demande devis :
 
-🚗 Véhicule
-${d.vehicule || "Non renseigné"}
+${d.vehicule || "Véhicule non renseigné"}
 Plaque : ${d.immatriculation || "Non renseignée"}
-
-🧩 Pièces
 
 ${lignes || "Aucune pièce renseignée"}
 
-💰 Total : ${money(total)}
+Total : ${money(total)}
 
-Merci pour votre retour.`;
+Merci pour votre confiance.${blocValidation}
+
+Je reste dans l’attente de votre retour pour validation.`;
 }
 
 function envoyerDevisEmail(d){
@@ -943,10 +966,10 @@ async function telechargerDevisImage(d){
   }
 }
 
-async function envoyerDevisImageWhatsApp(d){
+async function envoyerDevisImageWhatsApp(d, options = {}){
   await telechargerDevisImage(d);
   const phone = cleanPhoneForWhatsApp(d.clientTelephone || "");
-  const text = devisMessageClient(d);
+  const text = devisMessageClient(d, options);
   const url = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
   window.open(url, "_blank");
 }
