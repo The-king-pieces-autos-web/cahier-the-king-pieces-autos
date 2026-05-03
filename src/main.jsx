@@ -81,7 +81,7 @@ function emptyFiche(user, fiches=[]){
 function linesFromFiche(f){
   return (f.pieces||[]).flatMap(p=>selectedProps(p).map(pr=>({
     id: `${p.id}-${pr.id}`, designation: p.designation, quantite: Number(p.quantite||1),
-    prixTTC: Number(pr.prix||0), note: pr.note || "", disponibilite: pr.disponibilite || "", disponibleQuand: pr.disponibleQuand || ""
+    prixTTC: Number(pr.prix||0), note: pr.note || "", image: pr.image || "", disponibilite: pr.disponibilite || "", disponibleQuand: pr.disponibleQuand || ""
   })));
 }
 function emptyDevisFromFiche(f, devis=[]){
@@ -864,12 +864,7 @@ WhatsApp : ${ENTREPRISE.whatsapp}`;
 }
 
 function envoyerDevisWhatsApp(d){
-  const phone = cleanPhoneForWhatsApp(d.clientTelephone || "");
-  const message = devisMessageClient(d);
-  const url = phone
-    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`;
-  window.open(url, "_blank");
+  ouvrirDevisWhatsAppModele(d);
 }
 
 function envoyerDevisEmail(d){
@@ -878,7 +873,7 @@ function envoyerDevisEmail(d){
   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function telechargerDevisHtml(d){
+function buildDevisHtml(d, autoPrint=false){
   const totalTTC = totalDevis(d);
   const totalHT = htFromTtc(totalTTC);
   const totalTVA = tvaFromTtc(totalTTC);
@@ -887,42 +882,122 @@ function telechargerDevisHtml(d){
     const qty = Number(l.quantite || 1);
     const unitHT = htFromTtc(unitTTC);
     const lineTTC = qty * unitTTC;
+    const img = l.image ? `<img class="piece-img" src="${l.image}">` : "";
     return `<tr>
-      <td>${i + 1}</td>
-      <td>${l.designation || ""}</td>
-      <td>${qty}</td>
-      <td>${money(unitHT)}</td>
-      <td>${money(unitTTC)}</td>
-      <td>${formatDisponibilite(l)}</td>
-      <td>${money(lineTTC)}</td>
+      <td class="num">${i + 1}</td>
+      <td class="designation-cell">
+        <div class="designation-wrap">
+          ${img}
+          <div>
+            <b>${l.designation || ""}</b>
+            <small>${formatDisponibilite(l)}</small>
+          </div>
+        </div>
+      </td>
+      <td class="qty">${qty}</td>
+      <td class="price">${money(unitHT)}</td>
+      <td class="price">${money(unitTTC)}</td>
+      <td class="price total-line">${money(lineTTC)}</td>
     </tr>`;
   }).join("");
 
-  const html = `<!doctype html>
-<html><head><meta charset="utf-8"><title>${d.numero || "devis"}</title>
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${d.numero || "devis"}</title>
 <style>
-body{font-family:Arial,Helvetica,sans-serif;color:#111827;margin:30px}
-.header{display:flex;justify-content:space-between;border-bottom:4px solid #0b2f73;padding-bottom:14px}
-h1,h2{color:#0b2f73;margin:0}.company{font-size:12px;line-height:1.5;margin-top:8px}
-.boxes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.box{border:1px solid #c7d7ef;border-radius:12px;padding:12px}
-table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px}th{background:#0b2f73;color:white;text-align:left;padding:9px}td{border:1px solid #d8e2f3;padding:8px}
-.totals{margin-top:20px;margin-left:auto;width:320px;border:1px solid #c7d7ef;border-radius:12px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #d8e2f3;font-weight:800}.grand{background:#000;color:#fff;font-size:18px}
-.footer{margin-top:40px;border-top:3px solid #0b2f73;padding-top:8px;text-align:center;font-size:11px;color:#475569}
-</style></head>
+@page{size:A4;margin:12mm}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#111827;background:#fff;font-size:12px}
+.header{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;align-items:start;padding-bottom:14px;border-bottom:4px solid #0b2f73}
+.brand{display:flex;align-items:center;gap:14px}
+.brand img{width:72px;height:72px;object-fit:contain}
+.brand h1{margin:0;font-size:26px;color:#0b2f73;letter-spacing:.3px}
+.subtitle{margin-top:4px;font-size:12px;color:#334155;font-weight:700}
+.company{margin-top:7px;line-height:1.45;color:#334155;font-size:11px}
+.doc-box{text-align:right}
+.doc-box h2{margin:0;color:#0b2f73;font-size:32px;letter-spacing:1px}
+.doc-meta{margin-top:10px;display:inline-grid;gap:5px;text-align:left;border:1px solid #c7d7ef;border-radius:12px;padding:10px 12px;background:#f8fbff;min-width:210px}
+.doc-meta div{display:flex;justify-content:space-between;gap:18px}.doc-meta span{color:#64748b;font-weight:700}.doc-meta b{color:#0b2f73}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.info-card{border:1px solid #c7d7ef;border-radius:14px;overflow:hidden;min-height:112px}
+.info-title{background:#f1f6ff;color:#0b2f73;font-weight:900;padding:9px 12px;border-bottom:1px solid #c7d7ef;font-size:14px}
+.info-body{padding:11px 12px;display:grid;gap:6px;line-height:1.35}
+.line{display:grid;grid-template-columns:110px 1fr;gap:8px}.line span{color:#64748b;font-weight:800}.line b{color:#111827}
+.details{margin-top:16px;border:1px solid #c7d7ef;border-radius:14px;overflow:hidden}
+.details-title{background:#f1f6ff;color:#0b2f73;font-size:15px;font-weight:900;padding:10px 12px;border-bottom:1px solid #c7d7ef}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#0b2f73;color:#fff;text-align:left;padding:10px 8px;font-size:11px;text-transform:uppercase}
+td{border-bottom:1px solid #d8e2f3;border-right:1px solid #d8e2f3;padding:8px;vertical-align:middle}
+td:last-child,th:last-child{border-right:none}.num{width:42px;text-align:center;color:#0b2f73;font-weight:900}.qty{width:60px;text-align:center;font-weight:800}.price{width:105px;text-align:right;white-space:nowrap;font-weight:800}.total-line{color:#000;font-weight:900}
+.designation-wrap{display:flex;align-items:center;gap:10px}.designation-wrap b{display:block;color:#111827;font-size:13px}.designation-wrap small{display:block;color:#475569;margin-top:4px;font-weight:700}.piece-img{width:86px;height:70px;object-fit:contain;border:1px solid #d8e2f3;border-radius:10px;background:#fff;padding:3px}
+.bottom-zone{display:grid;grid-template-columns:1fr 330px;gap:18px;align-items:end;margin-top:22px}.totals{border:1px solid #c7d7ef;border-radius:14px;overflow:hidden;background:#fff}.totals-row{display:flex;justify-content:space-between;gap:20px;padding:11px 12px;border-bottom:1px solid #d8e2f3;font-weight:800}.totals-row span{color:#334155}.totals-row b{color:#0b2f73}.totals-row.grand{background:#000;color:#fff;border-bottom:none;font-size:18px;padding:13px 12px}.totals-row.grand span,.totals-row.grand b{color:#fff}
+.conditions{margin-top:18px;border-top:1px solid #d8e2f3;padding-top:10px;color:#475569;font-size:11px;line-height:1.45}
+.footer{position:fixed;bottom:9mm;left:12mm;right:12mm;text-align:center;border-top:3px solid #0b2f73;padding-top:7px;color:#475569;font-size:10.5px;line-height:1.45}.footer b{color:#0b2f73}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
 <body>
-<div class="header">
-  <div><h1>${ENTREPRISE.nom}</h1><div class="company">📍 ${ENTREPRISE.adresse}<br>☎️ ${ENTREPRISE.tel} — WhatsApp ${ENTREPRISE.whatsapp}<br>✉️ ${ENTREPRISE.email}</div></div>
-  <div style="text-align:right"><h2>DEVIS</h2><b>N° ${d.numero || ""}</b><br><b>Date : ${d.date || ""}</b></div>
-</div>
-<div class="boxes">
-  <div class="box"><b>Client</b><br>${d.clientNom || ""}<br>${d.clientTelephone || ""}</div>
-  <div class="box"><b>Véhicule</b><br>${d.vehicule || ""}<br>Plaque : ${d.immatriculation || ""}<br>VIN : ${d.vin || ""}</div>
-</div>
-<table><thead><tr><th>N°</th><th>Désignation</th><th>Qté</th><th>Prix HT</th><th>Prix TTC</th><th>Disponibilité</th><th>Total TTC</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="totals"><div><span>Total HT</span><b>${money(totalHT)}</b></div><div><span>TVA 20%</span><b>${money(totalTVA)}</b></div><div class="grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div></div>
-<div class="footer">${ENTREPRISE.nom} — ${ENTREPRISE.adresse}<br>${ENTREPRISE.email} — ${ENTREPRISE.tel} — TVA : ${ENTREPRISE.tvaNumber || ""}</div>
-</body></html>`;
+<div class="page">
+  <div class="header">
+    <div class="brand">
+      <img src="${logo}">
+      <div>
+        <h1>${ENTREPRISE.nom}</h1>
+        <div class="subtitle">${ENTREPRISE.slogan || "Vente toutes marques"}</div>
+        <div class="company">📍 ${ENTREPRISE.adresse}<br>☎️ ${ENTREPRISE.tel} | WhatsApp ${ENTREPRISE.whatsapp}<br>✉️ ${ENTREPRISE.email}</div>
+      </div>
+    </div>
+    <div class="doc-box">
+      <h2>DEVIS</h2>
+      <div class="doc-meta">
+        <div><span>N°</span><b>${d.numero || ""}</b></div>
+        <div><span>Date</span><b>${d.date || ""}</b></div>
+        <div><span>Validité</span><b>7 jours</b></div>
+      </div>
+    </div>
+  </div>
 
+  <div class="info-grid">
+    <div class="info-card"><div class="info-title">Client</div><div class="info-body">
+      <div class="line"><span>Nom</span><b>${d.clientNom || ""}</b></div>
+      <div class="line"><span>Téléphone</span><b>${d.clientTelephone || ""}</b></div>
+    </div></div>
+    <div class="info-card"><div class="info-title">Véhicule</div><div class="info-body">
+      <div class="line"><span>Véhicule</span><b>${d.vehicule || ""}</b></div>
+      <div class="line"><span>Immat.</span><b>${d.immatriculation || ""}</b></div>
+      <div class="line"><span>VIN</span><b>${d.vin || ""}</b></div>
+    </div></div>
+  </div>
+
+  <div class="details">
+    <div class="details-title">Détail du devis</div>
+    <table>
+      <thead><tr><th>N°</th><th>Désignation / image / disponibilité</th><th>Qté</th><th>Prix HT</th><th>Prix TTC</th><th>Total TTC</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+
+  <div class="bottom-zone">
+    <div></div>
+    <div class="totals">
+      <div class="totals-row"><span>Total HT</span><b>${money(totalHT)}</b></div>
+      <div class="totals-row"><span>TVA 20%</span><b>${money(totalTVA)}</b></div>
+      <div class="totals-row grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div>
+    </div>
+  </div>
+
+  <div class="conditions">Les références restent internes au magasin et ne figurent pas sur le devis client. Les prix sont indiqués TTC, sous réserve de disponibilité des pièces.</div>
+  <div class="footer"><b>${ENTREPRISE.nom}</b> — ${ENTREPRISE.adresse}<br>Email : ${ENTREPRISE.email} — Téléphone : ${ENTREPRISE.tel} — WhatsApp : ${ENTREPRISE.whatsapp}<br>TVA : ${ENTREPRISE.tvaNumber || ""}</div>
+</div>
+${autoPrint ? "<script>window.print()</script>" : ""}
+</body>
+</html>`;
+}
+
+function telechargerDevisHtml(d){
+  const html = buildDevisHtml(d, false);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -934,443 +1009,25 @@ table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px}th{back
   URL.revokeObjectURL(url);
 }
 
+function ouvrirDevisWhatsAppModele(d){
+  const html = buildDevisHtml(d, false);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+
+  const phone = cleanPhoneForWhatsApp(d.clientTelephone || "");
+  const text = `Bonjour ${d.clientNom || ""}, voici votre devis ${d.numero || ""} de ${ENTREPRISE.nom}. Je vous envoie le devis au format visuel avec les images des pièces. Merci pour votre confiance.`;
+  const wa = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(wa, "_blank");
+}
+
+
 function printDevisClient(d){
-  const lignes = d.lignes || [];
-  const rows = lignes.map((l, i) => {
-    const unitTTC = Number(l.prixTTC || 0);
-    const qty = Number(l.quantite || 1);
-    const unitHT = htFromTtc(unitTTC);
-    const lineTTC = qty * unitTTC;
-    const lineHT = qty * unitHT;
-    return `
-      <tr>
-        <td class="num">${i + 1}</td>
-        <td class="designation">${l.designation || ""}</td>
-        <td class="qty">${qty}</td>
-        <td class="price">${money(unitHT)}</td>
-        <td class="price">${money(unitTTC)}</td>
-        <td>${formatDisponibilite(l)}</td><td class="price total-line">${money(lineTTC)}</td>
-      </tr>
-    `;
-  }).join("");
-
-  const totalTTC = totalDevis(d);
-  const totalHT = htFromTtc(totalTTC);
-  const totalTVA = tvaFromTtc(totalTTC);
-
   const w = window.open("", "_blank");
-  w.document.write(`
-    <html>
-      <head>
-        <title>${d.numero}</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 12mm;
-          }
-
-          * {
-            box-sizing: border-box;
-          }
-
-          body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            color: #111827;
-            background: #ffffff;
-            font-size: 12px;
-          }
-
-          .page {
-            width: 100%;
-            min-height: 100%;
-          }
-
-          .header {
-            display: grid;
-            grid-template-columns: 1.2fr .8fr;
-            gap: 20px;
-            align-items: start;
-            padding-bottom: 14px;
-            border-bottom: 4px solid #0b2f73;
-          }
-
-          .brand {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-          }
-
-          .brand img {
-            width: 72px;
-            height: 72px;
-            object-fit: contain;
-          }
-
-          .brand h1 {
-            margin: 0;
-            font-size: 26px;
-            color: #0b2f73;
-            letter-spacing: .3px;
-          }
-
-          .brand .subtitle {
-            margin-top: 4px;
-            font-size: 12px;
-            color: #334155;
-            font-weight: 700;
-          }
-
-          .company {
-            margin-top: 7px;
-            line-height: 1.45;
-            color: #334155;
-            font-size: 11px;
-          }
-
-          .doc-box {
-            text-align: right;
-          }
-
-          .doc-box h2 {
-            margin: 0;
-            color: #0b2f73;
-            font-size: 32px;
-            letter-spacing: 1px;
-          }
-
-          .doc-meta {
-            margin-top: 10px;
-            display: inline-grid;
-            gap: 5px;
-            text-align: left;
-            border: 1px solid #c7d7ef;
-            border-radius: 12px;
-            padding: 10px 12px;
-            background: #f8fbff;
-            min-width: 210px;
-          }
-
-          .doc-meta div {
-            display: flex;
-            justify-content: space-between;
-            gap: 18px;
-          }
-
-          .doc-meta span {
-            color: #64748b;
-            font-weight: 700;
-          }
-
-          .doc-meta b {
-            color: #0b2f73;
-          }
-
-          .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 16px;
-          }
-
-          .info-card {
-            border: 1px solid #c7d7ef;
-            border-radius: 14px;
-            overflow: hidden;
-            min-height: 112px;
-          }
-
-          .info-title {
-            background: #f1f6ff;
-            color: #0b2f73;
-            font-weight: 900;
-            padding: 9px 12px;
-            border-bottom: 1px solid #c7d7ef;
-            font-size: 14px;
-          }
-
-          .info-body {
-            padding: 11px 12px;
-            display: grid;
-            gap: 6px;
-            line-height: 1.35;
-          }
-
-          .line {
-            display: grid;
-            grid-template-columns: 110px 1fr;
-            gap: 8px;
-          }
-
-          .line span {
-            color: #64748b;
-            font-weight: 800;
-          }
-
-          .line b {
-            color: #111827;
-          }
-
-          .details {
-            margin-top: 16px;
-            border: 1px solid #c7d7ef;
-            border-radius: 14px;
-            overflow: hidden;
-          }
-
-          .details-title {
-            background: #f1f6ff;
-            color: #0b2f73;
-            font-size: 15px;
-            font-weight: 900;
-            padding: 10px 12px;
-            border-bottom: 1px solid #c7d7ef;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-          }
-
-          th {
-            background: #0b2f73;
-            color: #ffffff;
-            text-align: left;
-            padding: 10px 8px;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: .25px;
-          }
-
-          td {
-            border-bottom: 1px solid #d8e2f3;
-            border-right: 1px solid #d8e2f3;
-            padding: 9px 8px;
-            vertical-align: middle;
-          }
-
-          tr:last-child td {
-            border-bottom: none;
-          }
-
-          td:last-child,
-          th:last-child {
-            border-right: none;
-          }
-
-          .num {
-            width: 42px;
-            text-align: center;
-            color: #0b2f73;
-            font-weight: 900;
-          }
-
-          .designation {
-            font-weight: 700;
-            color: #111827;
-          }
-
-          .qty {
-            width: 70px;
-            text-align: center;
-            font-weight: 800;
-          }
-
-          .price {
-            width: 110px;
-            text-align: right;
-            white-space: nowrap;
-            font-weight: 800;
-          }
-
-          .total-line {
-            color: #000;
-            font-weight: 900;
-          }
-
-          .bottom-zone {
-            display: grid;
-            grid-template-columns: 1fr 330px;
-            gap: 18px;
-            align-items: end;
-            margin-top: 22px;
-          }
-
-          .note-box {
-            border: 1px solid #d8e2f3;
-            border-radius: 14px;
-            padding: 12px;
-            min-height: 95px;
-            background: #fbfdff;
-            color: #334155;
-            line-height: 1.5;
-          }
-
-          .note-box b {
-            color: #0b2f73;
-          }
-
-          .totals {
-            border: 1px solid #c7d7ef;
-            border-radius: 14px;
-            overflow: hidden;
-            background: #ffffff;
-          }
-
-          .totals-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
-            padding: 11px 12px;
-            border-bottom: 1px solid #d8e2f3;
-            font-weight: 800;
-          }
-
-          .totals-row span {
-            color: #334155;
-          }
-
-          .totals-row b {
-            color: #0b2f73;
-          }
-
-          .totals-row.grand {
-            background: #000000;
-            color: #ffffff;
-            border-bottom: none;
-            font-size: 18px;
-            padding: 13px 12px;
-          }
-
-          .totals-row.grand span,
-          .totals-row.grand b {
-            color: #ffffff;
-          }
-
-          .conditions {
-            margin-top: 18px;
-            border-top: 1px solid #d8e2f3;
-            padding-top: 10px;
-            color: #475569;
-            font-size: 11px;
-            line-height: 1.45;
-          }
-
-          .footer {
-            position: fixed;
-            bottom: 9mm;
-            left: 12mm;
-            right: 12mm;
-            text-align: center;
-            border-top: 3px solid #0b2f73;
-            padding-top: 7px;
-            color: #475569;
-            font-size: 10.5px;
-            line-height: 1.45;
-          }
-
-          .footer b {
-            color: #0b2f73;
-          }
-
-          @media print {
-            body {
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-          }
-        </style>
-      </head>
-
-      <body>
-        <div class="page">
-          <div class="header">
-            <div class="brand">
-              <img src="${logo}">
-              <div>
-                <h1>${ENTREPRISE.nom}</h1>
-                <div class="subtitle">${ENTREPRISE.slogan || "Vente toutes marques"}</div>
-                <div class="company">
-                  📍 ${ENTREPRISE.adresse}<br>
-                  ☎️ ${ENTREPRISE.tel} &nbsp; | &nbsp; WhatsApp ${ENTREPRISE.whatsapp}<br>
-                  ✉️ ${ENTREPRISE.email}
-                </div>
-              </div>
-            </div>
-
-            <div class="doc-box">
-              <h2>DEVIS</h2>
-              <div class="doc-meta">
-                <div><span>N°</span><b>${d.numero || ""}</b></div>
-                <div><span>Date</span><b>${d.date || ""}</b></div>
-                <div><span>Validité</span><b>7 jours</b></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="info-grid">
-            <div class="info-card">
-              <div class="info-title">Client</div>
-              <div class="info-body">
-                <div class="line"><span>Nom</span><b>${d.clientNom || ""}</b></div>
-                <div class="line"><span>Téléphone</span><b>${d.clientTelephone || ""}</b></div>
-              </div>
-            </div>
-
-            <div class="info-card">
-              <div class="info-title">Véhicule</div>
-              <div class="info-body">
-                <div class="line"><span>Véhicule</span><b>${d.vehicule || ""}</b></div>
-                <div class="line"><span>Immat.</span><b>${d.immatriculation || ""}</b></div>
-                <div class="line"><span>VIN</span><b>${d.vin || ""}</b></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="details">
-            <div class="details-title">Détail du devis</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>N°</th>
-                  <th>Désignation</th>
-                  <th>Qté</th>
-                  <th>Prix HT</th>
-                  <th>Prix TTC</th>
-                  <th>Total TTC</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-
-          <div class="bottom-zone totals-only">
-            <div></div>
-            <div class="totals">
-              <div class="totals-row"><span>Total HT</span><b>${money(totalHT)}</b></div>
-              <div class="totals-row"><span>TVA 20%</span><b>${money(totalTVA)}</b></div>
-              <div class="totals-row grand"><span>Total TTC</span><b>${money(totalTTC)}</b></div>
-            </div>
-          </div>
-
-          <div class="conditions">
-            Les références restent internes au magasin et ne figurent pas sur le devis client. Les prix sont indiqués TTC, sous réserve de disponibilité des pièces.
-          </div>
-
-          <div class="footer">
-            <b>${ENTREPRISE.nom}</b> — ${ENTREPRISE.adresse}<br>
-            Email : ${ENTREPRISE.email} — Téléphone : ${ENTREPRISE.tel} — WhatsApp : ${ENTREPRISE.whatsapp}<br>
-            TVA : ${ENTREPRISE.tvaNumber}
-          </div>
-        </div>
-
-        <script>window.print()</script>
-      </body>
-    </html>
-  `);
+  w.document.write(buildDevisHtml(d, true));
   w.document.close();
-}function printArchiveJour(a){
+}
+function printArchiveJour(a){
   const resumeRows = (a.resume || []).map(r=>`
     <tr>
       <td>${r.nom}</td>
