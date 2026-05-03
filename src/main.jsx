@@ -814,31 +814,53 @@ function formatDisponibilite(l){
 }
 
 function devisMessageClient(d){
-  const total = money(totalDevis(d));
+  const totalTTC = totalDevis(d);
+  const totalHT = htFromTtc(totalTTC);
+  const totalTVA = tvaFromTtc(totalTTC);
+
   const lignes = (d.lignes || [])
-    .map((l) => `• ${l.designation || ""} : ${money(Number(l.quantite || 1) * Number(l.prixTTC || 0))} TTC
-  Disponibilité : ${formatDisponibilite(l)}`)
+    .map((l, index) => {
+      const qty = Number(l.quantite || 1);
+      const unitTTC = Number(l.prixTTC || 0);
+      const lineTTC = qty * unitTTC;
+      return `${index + 1}. ${l.designation || ""}
+   Quantité : ${qty}
+   Prix TTC : ${money(unitTTC)}
+   Total TTC : ${money(lineTTC)}
+   Disponibilité : ${formatDisponibilite(l)}`;
+    })
     .join("\n\n");
 
   return `Bonjour ${d.clientNom || ""},
 
-Voici votre devis ${d.numero || ""}.
+━━━━━━━━━━━━━━━━━━━━
+DEVIS ${d.numero || ""}
+${ENTREPRISE.nom}
+━━━━━━━━━━━━━━━━━━━━
 
-Client : ${d.clientNom || ""}
+CLIENT
+Nom : ${d.clientNom || ""}
+Téléphone : ${d.clientTelephone || ""}
+
+VÉHICULE
 Plaque : ${d.immatriculation || ""}
-Véhicule : ${d.vehicule || ""}
-Demande reçue : ${sourceLabel(d.source)}
+Modèle : ${d.vehicule || ""}
+Origine demande : ${sourceLabel(d.source)}
 
-${lignes}
+DÉTAIL DES PIÈCES
+${lignes || "Aucune ligne renseignée"}
 
-Total TTC : ${total}
+RÉCAPITULATIF
+Total HT : ${money(totalHT)}
+TVA 20% : ${money(totalTVA)}
+TOTAL TTC : ${money(totalTTC)}
 
 Merci pour votre confiance.
 
 ${ENTREPRISE.nom}
-Téléphone : ${ENTREPRISE.tel}
-WhatsApp : ${ENTREPRISE.whatsapp}
-Adresse : ${ENTREPRISE.adresse}`;
+📍 ${ENTREPRISE.adresse}
+📞 ${ENTREPRISE.tel}
+WhatsApp : ${ENTREPRISE.whatsapp}`;
 }
 
 function envoyerDevisWhatsApp(d){
