@@ -444,3 +444,35 @@ nav{display:grid;gap:10px}nav button{justify-content:flex-start;background:rgba(
   margin-bottom:16px;
   font-weight:900;
 }
+
+.paste-image-zone{
+  width:170px;
+  min-height:90px;
+  border:2px dashed var(--gold);
+  border-radius:14px;
+  background:#fffaf0;
+  color:#5a4300;
+  display:grid;
+  place-items:center;
+  text-align:center;
+  gap:4px;
+  padding:9px;
+  cursor:text;
+  outline:none;
+}
+.paste-image-zone:focus{
+  box-shadow:0 0 0 4px rgba(212,162,28,.22);
+  border-color:#b98500;
+}
+.paste-image-zone svg{
+  width:22px;
+  height:22px;
+}
+.paste-image-zone b{
+  font-size:13px;
+}
+.paste-image-zone small{
+  color:#7a5200;
+  font-size:11px;
+  line-height:1.25;
+}
