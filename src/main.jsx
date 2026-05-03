@@ -24,6 +24,8 @@ const ENTREPRISE = {
 const LS_KEY = "tkpa_cahier_pro_v4";
 const SESSION_KEY = "tkpa_current_user";
 const CLOTURE_HEURE = 19;
+const AUTO_BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 heure
+const AUTO_BACKUP_MAX = 80;
 
 const CAR_MODELS = {
   "Peugeot": ["106","107","108","206","207","208","307","308","407","508","2008","3008","5008","Partner","Expert","Boxer"],
@@ -128,6 +130,64 @@ function closeDay(data, dateValue=today()){
   const archivesJour = data.archivesJour.some(a=>a.date===dateValue) ? data.archivesJour.map(a=>a.date===dateValue?arch:a) : [arch, ...data.archivesJour];
   return { ...data, archivesJour, lastClosureDate: dateValue, fiches: data.fiches.map(f=>f.date===dateValue?{...f, archiveJourId:arch.id}:f), devis: data.devis.map(d=>d.date===dateValue?{...d, archiveJourId:arch.id}:d) };
 }
+
+function hasWorkToBackup(data){
+  return Boolean(
+    (Array.isArray(data?.fiches) && data.fiches.length) ||
+    (Array.isArray(data?.devis) && data.devis.length)
+  );
+}
+
+function buildAutoBackup(data, dateValue=today(), timeValue=nowTime()){
+  const fiches = Array.isArray(data.fiches) ? data.fiches : [];
+  const devis = Array.isArray(data.devis) ? data.devis : [];
+  const users = Array.isArray(data.users) ? data.users : [];
+
+  return {
+    id: `AUTO-${dateValue}-${timeValue.replace(":", "h")}-${Date.now()}`,
+    type: "auto",
+    date: dateValue,
+    heure: timeValue,
+    createdAt: new Date().toISOString(),
+    titre: `Sauvegarde automatique ${dateValue} ${timeValue}`,
+    fiches: JSON.parse(JSON.stringify(fiches)),
+    devis: JSON.parse(JSON.stringify(devis)),
+    users: JSON.parse(JSON.stringify(users)),
+    resume: users.map((u) => {
+      const fichesUser = fiches.filter((f) => f.creeParId === u.id);
+      const devisUser = devis.filter((d) => d.creeParId === u.id);
+      return {
+        userId: u.id,
+        nom: u.nom,
+        fiches: fichesUser.length,
+        devis: devisUser.length,
+        total: devisUser.reduce((s, d) => s + totalDevis(d), 0)
+      };
+    })
+  };
+}
+
+function createHourlyBackupState(data){
+  if(!hasWorkToBackup(data)) return data;
+
+  const backup = buildAutoBackup(data);
+  const archives = Array.isArray(data.archivesJour) ? data.archivesJour : [];
+
+  const sameHourExists = archives.some((a) =>
+    a.type === "auto" &&
+    a.date === backup.date &&
+    String(a.heure || "").slice(0, 2) === String(backup.heure || "").slice(0, 2)
+  );
+
+  if(sameHourExists) return data;
+
+  return {
+    ...data,
+    archivesJour: [backup, ...archives].slice(0, AUTO_BACKUP_MAX),
+    lastAutoBackupAt: backup.createdAt
+  };
+}
+
 function shouldAutoClose(data){ const d = new Date(); return d.getHours() >= CLOTURE_HEURE && data.lastClosureDate !== today(); }
 
 function downloadJsonFile(filename, payload){
@@ -223,6 +283,26 @@ function App(){
 
   useEffect(()=>{ if(currentUser) setSelectedUserId(currentUser.role==="admin"?"all":currentUser.id); },[currentUser?.id]);
   useEffect(()=>{ if(shouldAutoClose(data)) commit(closeDay(data, today())); },[data.fiches.length, data.devis.length]);
+
+  useEffect(()=>{
+    const interval = setInterval(() => {
+      setData((current) => {
+        const next = createHourlyBackupState(current);
+        if(next === current) return current;
+
+        lastSaveRef.current = Date.now();
+        saveLocal(next);
+        saveCloud(next)
+          .then(()=>setSyncStatus("Sauvegarde automatique enregistrée"))
+          .catch(e=>{ console.error(e); setSyncStatus("Erreur sauvegarde automatique"); });
+
+        return next;
+      });
+    }, AUTO_BACKUP_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  },[]);
+
 
   function commit(next){
     const clean=normalizeState(next); lastSaveRef.current=Date.now(); setData(clean); saveLocal(clean);
@@ -385,8 +465,11 @@ function App(){
             <label className="upload backup-upload"><Archive/>Restaurer une sauvegarde<input type="file" accept="application/json,.json" onChange={(e)=>restoreFullBackup(e.target.files?.[0])}/></label>
           </div>
         </div>
-        <div className="actions top-actions"><button className="primary" onClick={()=>commit(closeDay(data,today()))}><Save/>Sauvegarder / clôturer aujourd’hui</button></div>
-        <div className="cards">{data.archivesJour.map(a=><article className="fiche-card" key={a.id}><h3>Dossier du {a.date}</h3><p>{a.fiches.length} fiche(s) · {a.devis.length} devis détaillé(s)</p><div className="mini-pieces">{a.resume.map(r=><span key={r.userId}>{r.nom}: {r.fiches} fiches / {r.devis} devis</span>)}</div><div className="actions"><button onClick={()=>setArchiveOpen(a)}><Eye/>Ouvrir le dossier complet</button><button onClick={()=>printArchiveJour(a)}><Printer/>Imprimer résumé</button></div></article>)}</div></section>}
+        <div className="actions top-actions">
+          <button className="primary" onClick={()=>commit(closeDay(data,today()))}><Save/>Sauvegarder / clôturer aujourd’hui</button>
+          <button onClick={()=>commit(createHourlyBackupState(data))}><Archive/>Créer une sauvegarde automatique maintenant</button>
+        </div>
+        <div className="cards">{data.archivesJour.map(a=><article className="fiche-card" key={a.id}><h3>{a.type==="auto" ? `Sauvegarde auto du ${a.date}` : `Dossier du ${a.date}`}</h3><p>{a.heure ? `Heure : ${a.heure} · ` : ""}{a.fiches.length} fiche(s) · {a.devis.length} devis détaillé(s)</p><div className="mini-pieces">{a.resume.map(r=><span key={r.userId}>{r.nom}: {r.fiches} fiches / {r.devis} devis</span>)}</div><div className="actions"><button onClick={()=>setArchiveOpen(a)}><Eye/>Ouvrir le dossier complet</button><button onClick={()=>printArchiveJour(a)}><Printer/>Imprimer résumé</button></div></article>)}</div></section>}
 
       {active==="users"&&currentUser.role==="admin"&&<section><Header title="Utilisateurs" subtitle="Créer et supprimer les comptes salariés."/><div className="user-grid"><div className="panel"><h3>Créer utilisateur</h3><input placeholder="Nom" value={userForm.nom} onChange={e=>setUserForm({...userForm,nom:e.target.value})}/><input placeholder="Identifiant" value={userForm.identifiant} onChange={e=>setUserForm({...userForm,identifiant:e.target.value})}/><input placeholder="Mot de passe" value={userForm.motDePasse} onChange={e=>setUserForm({...userForm,motDePasse:e.target.value})}/><select value={userForm.role} onChange={e=>setUserForm({...userForm,role:e.target.value})}><option value="salarie">Salarié</option><option value="admin">Admin</option></select><button className="primary" onClick={()=>{if(!userForm.nom||!userForm.identifiant||!userForm.motDePasse)return alert("Remplis tout.");commit({...data,users:[...data.users,{...userForm,id:uid()}]});setUserForm({nom:"",identifiant:"",motDePasse:"",role:"salarie"});}}><Plus/>Ajouter</button></div><div className="panel"><h3>Liste</h3>{data.users.map(u=><div className="user-row" key={u.id}><div><b>{u.nom}</b><small>{u.identifiant} · {u.role} · mot de passe : {u.motDePasse}</small></div>{u.id!==currentUser.id&&<button className="danger" onClick={()=>{if(confirm("Supprimer ?"))commit({...data,users:data.users.filter(x=>x.id!==u.id)})}}><Trash2/>Supprimer</button>}</div>)}</div></div></section>}
 
@@ -522,7 +605,7 @@ function ArchiveModal({archive, close}){
         <div className="modal-header-pro">
           <div>
             <h2>Dossier journalier du {archive.date}</h2>
-            <p>Archive complète : fiches du cahier, devis détaillés et résumé par salarié.</p>
+            <p>Archive complète : fiches du cahier, devis détaillés et résumé par salarié. Les sauvegardes automatiques sont conservées séparément par heure.</p>
           </div>
           <button onClick={close}><X/></button>
         </div>
