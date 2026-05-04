@@ -283,7 +283,7 @@ function closeDay(data, dateValue=today()){
 }
 
 
-function downloadJsonFile(filename, payload){
+function downloadAutoBackupJsonFile(filename, payload){
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -301,7 +301,7 @@ function autoDownloadBackup(data, backup){
     if(localStorage.getItem(AUTO_DOWNLOAD_BACKUP_KEY) === key) return;
 
     const filename = `sauvegarde-auto-${backup.date}-${String(backup.heure || "").replace(":", "h")}.json`;
-    downloadJsonFile(filename, normalizeState(data));
+    downloadAutoBackupJsonFile(filename, normalizeState(data));
     localStorage.setItem(AUTO_DOWNLOAD_BACKUP_KEY, key);
   }catch(e){
     console.warn("Téléchargement automatique sauvegarde impossible", e);
