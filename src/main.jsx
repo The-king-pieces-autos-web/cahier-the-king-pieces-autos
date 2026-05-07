@@ -29,7 +29,7 @@ const SAFE_BACKUP_LIST_KEY = "tkpa_cahier_safe_versions";
 const AUTO_DOWNLOAD_BACKUP_KEY = "tkpa_last_auto_download_backup";
 const CLOTURE_HEURE = 19;
 const AUTO_BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
-const AUTO_BACKUP_MAX = 80;
+const AUTO_BACKUP_MAX = 30;
 
 const CAR_MODELS = {
   "Peugeot": ["106","107","108","206","207","208","307","308","407","508","2008","3008","5008","Partner","Expert","Boxer"],
@@ -121,15 +121,69 @@ function isDangerouslyEmpty(next, current){
   return currentHasWork && nextHasNoWork;
 }
 
+
+function stripHeavyImages(value){
+  if(Array.isArray(value)) return value.map(stripHeavyImages);
+  if(value && typeof value === "object"){
+    const out = {};
+    Object.entries(value).forEach(([k,v])=>{
+      if(k === "image" && typeof v === "string" && v.startsWith("data:image")){
+        out[k] = "";
+      } else {
+        out[k] = stripHeavyImages(v);
+      }
+    });
+    return out;
+  }
+  return value;
+}
+
+function safeSetLocalStorage(key, value){
+  try{
+    localStorage.setItem(key, value);
+    return true;
+  }catch(e){
+    if(e?.name === "QuotaExceededError"){
+      console.warn("LocalStorage plein : nettoyage des sauvegardes locales lourdes.");
+      try{
+        localStorage.removeItem(SAFE_BACKUP_KEY);
+        localStorage.removeItem(SAFE_BACKUP_LIST_KEY);
+        localStorage.removeItem("tkpa_last_auto_download_backup");
+        localStorage.removeItem("tkpa_cahier_pro_v1");
+        localStorage.removeItem("tkpa_cahier_pro_v3");
+        localStorage.removeItem("tkpa_cahier_final_v1");
+      }catch{}
+      try{
+        localStorage.setItem(key, value);
+        return true;
+      }catch(e2){
+        console.warn("LocalStorage encore plein : sauvegarde allégée sans images.");
+        try{
+          localStorage.setItem(key, JSON.stringify(stripHeavyImages(JSON.parse(value))));
+          return true;
+        }catch(e3){
+          console.error("Impossible d'écrire dans LocalStorage, sauvegarde Supabase conservée.", e3);
+          return false;
+        }
+      }
+    }
+    console.error(e);
+    return false;
+  }
+}
+
 function saveSafeSnapshot(data, reason="auto"){
   try{
     const clean = normalizeState(data);
     if(!hasBusinessData(clean)) return;
     const snapshot = { savedAt: new Date().toISOString(), reason, payload: clean };
-    localStorage.setItem(SAFE_BACKUP_KEY, JSON.stringify(snapshot));
+    // Sauvegarde locale de sécurité allégée : on ne duplique pas les images base64.
+    const lightSnapshot = {...snapshot, payload: stripHeavyImages(snapshot.payload)};
+    safeSetLocalStorage(SAFE_BACKUP_KEY, JSON.stringify(lightSnapshot));
+
     const list = JSON.parse(localStorage.getItem(SAFE_BACKUP_LIST_KEY) || "[]");
-    list.unshift(snapshot);
-    localStorage.setItem(SAFE_BACKUP_LIST_KEY, JSON.stringify(list.slice(0, 20)));
+    list.unshift(lightSnapshot);
+    safeSetLocalStorage(SAFE_BACKUP_LIST_KEY, JSON.stringify(list.slice(0, 5)));
   }catch(e){
     console.warn("Erreur sauvegarde locale sécurisée", e);
   }
@@ -211,7 +265,13 @@ function loadState(){ try{ const x=localStorage.getItem(LS_KEY); if(x) return no
 function saveLocal(data){
   const clean = normalizeState(data);
   if(hasBusinessData(clean)) saveSafeSnapshot(clean, "saveLocal");
-  localStorage.setItem(LS_KEY, JSON.stringify(clean));
+
+  // La copie principale locale peut être lourde avec les images.
+  // Si le navigateur est plein, on garde une copie allégée sans images au lieu de faire planter le site.
+  const ok = safeSetLocalStorage(LS_KEY, JSON.stringify(clean));
+  if(!ok){
+    safeSetLocalStorage(LS_KEY + "_light", JSON.stringify(stripHeavyImages(clean)));
+  }
 }
 async function saveCloud(data){
   if(!hasSupabaseConfig) return;
@@ -759,7 +819,7 @@ function App(){
           <h3>Sauvegarde générale du site</h3>
           <p className="muted">Cette sauvegarde contient tout : utilisateurs, cahiers, devis, sauvegardes journalières et archives. À faire régulièrement.</p>
           <div className="actions">
-            <button className="primary" onClick={exportFullBackup}><Save/>Télécharger sauvegarde générale</button><button onClick={()=>{const safe=loadSafeSnapshot(); if(!safe){alert("Aucune copie locale de sécurité trouvée."); return;} commit(safe); alert("Dernière copie locale restaurée.");}}><Archive/>Restaurer dernière copie locale</button>
+            <button className="primary" onClick={exportFullBackup}><Save/>Télécharger sauvegarde générale</button><button onClick={()=>{const safe=loadSafeSnapshot(); if(!safe){alert("Aucune copie locale de sécurité trouvée."); return;} commit(safe); alert("Dernière copie locale restaurée.");}}><Archive/>Restaurer dernière copie locale</button><button onClick={()=>{localStorage.removeItem(SAFE_BACKUP_KEY);localStorage.removeItem(SAFE_BACKUP_LIST_KEY);localStorage.removeItem("tkpa_cahier_pro_v1");localStorage.removeItem("tkpa_cahier_pro_v3");localStorage.removeItem("tkpa_cahier_final_v1");alert("Stockage navigateur nettoyé. Recharge la page avec Ctrl+F5.");}}><Trash2/>Nettoyer stockage navigateur</button>
             <label className="upload backup-upload"><Archive/>Restaurer une sauvegarde<input type="file" accept="application/json,.json" onChange={(e)=>restoreFullBackup(e.target.files?.[0])}/></label>
           </div>
         </div>
