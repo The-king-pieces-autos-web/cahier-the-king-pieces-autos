@@ -10,7 +10,7 @@ import "./styles.css";
 import html2canvas from "html2canvas";
 import logo from "./assets/logo.png";
 import hero from "./assets/dashboard-hero.jpeg";
-import { hasSupabaseConfig, loadCloudState, saveCloudState, subscribeCloudState, supabase } from "./lib/supabase";
+import { hasSupabaseConfig, loadCloudState, saveCloudState, subscribeCloudState, subscribeUsersTable, loadUsersTable, addUserTable, deleteUserTable, supabase } from "./lib/supabase";
 
 const ENTREPRISE = {
   nom: "THE KING PIECES AUTOS",
@@ -484,6 +484,16 @@ function App(){
           setSyncStatus("Fusion sécurité appliquée");
         }
         if(!cloud) await saveCloudState(clean);
+        let usersFromTable = null;
+        try {
+          usersFromTable = await loadUsersTable();
+        } catch(e) {
+          console.warn("Lecture tkpa_users impossible, utilisation app_state", e);
+        }
+        if(usersFromTable && usersFromTable.length){
+          clean = {...clean, users: usersFromTable};
+        }
+
         setData(clean); saveLocal(clean);
         const su=loadSession(clean.users); if(su) setCurrentUser(su);
         setSyncStatus("Synchronisé Supabase");
@@ -627,6 +637,34 @@ function App(){
     if(!confirm("Supprimer ce devis ?")) return;
     commit({...data, devis:data.devis.filter((d)=>d.id!==devId)});
   }
+
+  async function createUserAccount(){
+    if(!userForm.nom || !userForm.identifiant || !userForm.motDePasse) return alert("Remplis tout.");
+    const newUser = {...userForm, id:uid(), actif:true};
+
+    try{
+      const saved = hasSupabaseConfig ? await addUserTable(newUser) : newUser;
+      const users = [...data.users.filter((u)=>u.id!==saved.id && u.identifiant!==saved.identifiant), saved];
+      commit({...data, users});
+      setUserForm({nom:"", identifiant:"", motDePasse:"", role:"salarie"});
+      alert("Utilisateur créé et enregistré dans Supabase.");
+    }catch(e){
+      console.error(e);
+      alert("Erreur création utilisateur : " + (e?.message || e));
+    }
+  }
+
+  async function removeUserAccount(userId){
+    if(!confirm("Supprimer ce compte ?")) return;
+    try{
+      if(hasSupabaseConfig) await deleteUserTable(userId);
+      commit({...data, users:data.users.filter((u)=>u.id!==userId)});
+    }catch(e){
+      console.error(e);
+      alert("Erreur suppression utilisateur : " + (e?.message || e));
+    }
+  }
+
   function canEdit(f){ return currentUser?.role==="admin" || f.creeParId===currentUser?.id; }
   function canDelete(){ return currentUser?.role==="admin"; }
 
@@ -731,7 +769,7 @@ function App(){
         </div>
         <div className="cards">{data.archivesJour.map(a=><article className="fiche-card" key={a.id}><h3>{a.type==="auto" ? `Sauvegarde auto du ${a.date}` : `Dossier du ${a.date}`}</h3><p>{a.heure ? `Heure : ${a.heure} · ` : ""}{a.fiches.length} fiche(s) · {a.devis.length} devis détaillé(s)</p><div className="mini-pieces">{a.resume.map(r=><span key={r.userId}>{r.nom}: {r.fiches} fiches / {r.devis} devis</span>)}</div><div className="actions"><button onClick={()=>setArchiveOpen(a)}><Eye/>Ouvrir le dossier complet</button><button onClick={()=>printArchiveJour(a)}><Printer/>Imprimer résumé</button></div></article>)}</div></section>}
 
-      {active==="users"&&currentUser.role==="admin"&&<section><Header title="Utilisateurs" subtitle="Créer et supprimer les comptes salariés."/><div className="user-grid"><div className="panel"><h3>Créer utilisateur</h3><input placeholder="Nom" value={userForm.nom} onChange={e=>setUserForm({...userForm,nom:e.target.value})}/><input placeholder="Identifiant" value={userForm.identifiant} onChange={e=>setUserForm({...userForm,identifiant:e.target.value})}/><input placeholder="Mot de passe" value={userForm.motDePasse} onChange={e=>setUserForm({...userForm,motDePasse:e.target.value})}/><select value={userForm.role} onChange={e=>setUserForm({...userForm,role:e.target.value})}><option value="salarie">Salarié</option><option value="admin">Admin</option></select><button className="primary" onClick={()=>{if(!userForm.nom||!userForm.identifiant||!userForm.motDePasse)return alert("Remplis tout.");commit({...data,users:[...data.users,{...userForm,id:uid()}]});setUserForm({nom:"",identifiant:"",motDePasse:"",role:"salarie"});}}><Plus/>Ajouter</button></div><div className="panel"><h3>Liste</h3>{data.users.map(u=><div className="user-row" key={u.id}><div><b>{u.nom}</b><small>{u.identifiant} · {u.role} · mot de passe : {u.motDePasse}</small></div>{u.id!==currentUser.id&&<button className="danger" onClick={()=>{if(confirm("Supprimer ?"))commit({...data,users:data.users.filter(x=>x.id!==u.id)})}}><Trash2/>Supprimer</button>}</div>)}</div></div></section>}
+      {active==="users"&&currentUser.role==="admin"&&<section><Header title="Utilisateurs" subtitle="Créer et supprimer les comptes salariés. Chaque compte est enregistré séparément dans Supabase table tkpa_users."/><div className="info-banner">Les nouveaux comptes sont ajoutés automatiquement dans Supabase et ne remplacent plus les autres utilisateurs.</div><div className="user-grid"><div className="panel"><h3>Créer utilisateur</h3><input placeholder="Nom" value={userForm.nom} onChange={e=>setUserForm({...userForm,nom:e.target.value})}/><input placeholder="Identifiant" value={userForm.identifiant} onChange={e=>setUserForm({...userForm,identifiant:e.target.value})}/><input placeholder="Mot de passe" value={userForm.motDePasse} onChange={e=>setUserForm({...userForm,motDePasse:e.target.value})}/><select value={userForm.role} onChange={e=>setUserForm({...userForm,role:e.target.value})}><option value="salarie">Salarié</option><option value="admin">Admin</option></select><button className="primary" onClick={createUserAccount}><Plus/>Ajouter dans Supabase</button></div><div className="panel"><h3>Liste</h3>{data.users.map(u=><div className="user-row" key={u.id}><div><b>{u.nom}</b><small>{u.identifiant} · {u.role} · mot de passe : {u.motDePasse}</small></div>{u.id!==currentUser.id&&<button className="danger" onClick={()=>removeUserAccount(u.id)}><Trash2/>Supprimer</button>}</div>)}</div></div></section>}
 
       {preview&&<PreviewModal fiche={preview} close={()=>setPreview(null)} send={()=>sendToDevis(preview)}/>}
       {archiveOpen&&<ArchiveModal archive={archiveOpen} close={()=>setArchiveOpen(null)}/>}
