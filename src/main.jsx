@@ -10,7 +10,7 @@ import "./styles.css";
 import html2canvas from "html2canvas";
 import logo from "./assets/logo.png";
 import hero from "./assets/dashboard-hero.jpeg";
-import { hasSupabaseConfig, loadCloudState, saveCloudState, subscribeCloudState, subscribeUsersTable, loadUsersTable, addUserTable, deleteUserTable, supabase } from "./lib/supabase";
+import { hasSupabaseConfig, loadCloudState, saveCloudState, subscribeCloudState, subscribeUsersTable, loadUsersTable, addUserTable, deleteUserTable, saveSeparatedTables, loadSeparatedTables, subscribeSeparatedTables, supabase } from "./lib/supabase";
 
 const ENTREPRISE = {
   nom: "THE KING PIECES AUTOS",
@@ -315,6 +315,10 @@ async function saveCloud(data){
 
   if(hasBusinessData(merged)) saveSafeSnapshot(merged, "beforeCloudSaveMerged");
 
+  // Nouvelle architecture : on écrit aussi chaque fiche/devis dans ses tables séparées.
+  await saveSeparatedTables(merged);
+
+  // Ancien app_state gardé temporairement comme filet de sécurité pendant la migration.
   await saveCloudState(merged);
 }
 function saveSession(u){ localStorage.setItem(SESSION_KEY, JSON.stringify({ id:u.id, identifiant:u.identifiant, nom:u.nom, role:u.role, motDePasse:u.motDePasse })); }
@@ -552,6 +556,20 @@ function App(){
         }
         if(usersFromTable && usersFromTable.length){
           clean = {...clean, users: usersFromTable};
+        }
+
+        try {
+          const separated = await loadSeparatedTables();
+          if(separated){
+            clean = {
+              ...clean,
+              users: separated.users?.length ? separated.users : clean.users,
+              fiches: separated.fiches?.length ? separated.fiches : clean.fiches,
+              devis: separated.devis?.length ? separated.devis : clean.devis,
+            };
+          }
+        } catch(e) {
+          console.warn("Lecture tables séparées impossible, utilisation app_state", e);
         }
 
         setData(clean); saveLocal(clean);
