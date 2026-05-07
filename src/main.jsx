@@ -561,12 +561,21 @@ function App(){
         try {
           const separated = await loadSeparatedTables();
           if(separated){
-            clean = {
-              ...clean,
-              users: separated.users?.length ? separated.users : clean.users,
-              fiches: separated.fiches?.length ? separated.fiches : clean.fiches,
-              devis: separated.devis?.length ? separated.devis : clean.devis,
-            };
+            const hasSeparated =
+              (separated.users && separated.users.length) ||
+              (separated.fiches && separated.fiches.length) ||
+              (separated.devis && separated.devis.length);
+
+            if(hasSeparated){
+              // Les nouvelles tables séparées deviennent la source principale.
+              // app_state ne doit plus remettre le site à zéro.
+              clean = {
+                ...clean,
+                users: separated.users?.length ? separated.users : clean.users,
+                fiches: separated.fiches || [],
+                devis: separated.devis || [],
+              };
+            }
           }
         } catch(e) {
           console.warn("Lecture tables séparées impossible, utilisation app_state", e);
@@ -589,6 +598,7 @@ function App(){
           setSyncStatus("Mise à jour vide bloquée");
           return restored;
         }
+        // app_state n'est plus prioritaire : on fusionne, mais on ne laisse jamais une version plus pauvre remplacer les tables séparées/local.
         const merged = mergePayloadSafe(current, incoming);
         saveLocal(merged);
         const su=loadSession(merged.users); if(su) setCurrentUser(su);
@@ -641,19 +651,33 @@ function App(){
     lastSaveRef.current=Date.now();
     setData(clean);
     saveLocal(clean);
-    saveCloud(clean)
-      .then(async ()=>{
-        setSyncStatus(hasSupabaseConfig?"Sauvegardé et synchronisé":"Sauvegardé local");
+    (async()=>{
+      try{
         if(hasSupabaseConfig){
-          try{
-            const latest = await loadCloudState();
-            const mergedLatest = mergePayloadSafe(clean, latest || {});
-            setData(mergedLatest);
-            saveLocal(mergedLatest);
-          }catch(e){ console.warn("Relecture Supabase impossible après sauvegarde", e); }
+          // Ecriture directe dans les tables séparées AVANT app_state.
+          await saveSeparatedTables(clean);
+          await saveCloud(clean);
+          const separated = await loadSeparatedTables();
+          if(separated){
+            const next = {
+              ...clean,
+              users: separated.users?.length ? separated.users : clean.users,
+              fiches: separated.fiches || clean.fiches,
+              devis: separated.devis || clean.devis,
+            };
+            setData(next);
+            saveLocal(next);
+          }
+          setSyncStatus("Sauvegardé dans les tables séparées");
+        } else {
+          setSyncStatus("Sauvegardé local");
         }
-      })
-      .catch(e=>{ console.error(e); setSyncStatus("Erreur sauvegarde Supabase - copie locale conservée"); });
+      }catch(e){
+        console.error(e);
+        setSyncStatus("ERREUR : sauvegarde tables séparées impossible");
+        alert("Erreur sauvegarde Supabase : " + (e?.message || e));
+      }
+    })();
   }
   async function restoreFullBackup(file){
     if(!file) return;
