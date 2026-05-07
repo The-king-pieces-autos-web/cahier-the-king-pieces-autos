@@ -306,9 +306,31 @@ function rowToLigneDevis(r) {
   };
 }
 
+function uniqueRowsByConflict(rows = [], conflict = "id") {
+  const keys = String(conflict).split(",").map((x) => x.trim()).filter(Boolean);
+  const map = new Map();
+
+  rows.forEach((row) => {
+    if (!row) return;
+    const key = keys.map((k) => row[k] ?? "").join("||");
+    if (!key || key === "||") return;
+    map.set(key, row);
+  });
+
+  return Array.from(map.values());
+}
+
 async function safeUpsert(table, rows, conflict="id") {
   if (!supabase || !rows?.length) return;
-  const { error } = await supabase.from(table).upsert(rows, { onConflict: conflict });
+
+  const cleanRows = uniqueRowsByConflict(rows, conflict);
+
+  if (!cleanRows.length) return;
+
+  const { error } = await supabase
+    .from(table)
+    .upsert(cleanRows, { onConflict: conflict });
+
   if (error) throw error;
 }
 
